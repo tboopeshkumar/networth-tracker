@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Blocks commits that would publish personal data to this public repo.
+# Enable once per clone:  git config core.hooksPath tools/hooks
+set -euo pipefail
+
+fail=0
+while IFS= read -r f; do
+  case "$f" in
+    demo/*|*.xlsx|*.xls|*.ods|*.csv|*.tsv|data.json|*fixture*.json|networth-dashboard*.html)
+      echo "✖ refusing to commit $f — it can contain your financial data"
+      fail=1 ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+added=$(git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude)tools/hooks/pre-commit' | grep -E '^\+[^+]' || true)
+
+# Spreadsheet IDs and URLs belong in your browser's storage, not in git.
+if grep -qE 'docs\.google\.com/spreadsheets/d/[A-Za-z0-9_-]{20,}' <<<"$added"; then
+  echo "✖ staged changes contain a Google Sheets URL"
+  fail=1
+fi
+
+# An OAuth client SECRET never belongs in a browser app (they don't use one).
+if grep -qE 'GOCSPX-[A-Za-z0-9_-]{10,}' <<<"$added"; then
+  echo "✖ staged changes contain an OAuth client secret (GOCSPX-…). Browser apps don't need it — delete it and rotate it in Cloud Console."
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "Commit blocked. See README → Keeping your data out of the repo."
+  exit 1
+fi

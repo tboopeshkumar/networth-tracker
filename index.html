@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    GitHub Pages can't send security headers, so the policy lives here.
+    Scripts: only this site and Google's sign-in / Picker libraries.
+    Network: only Google's APIs. No inline scripts, no eval, no framing of other sites.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com;
+    style-src 'self' 'unsafe-inline' https://accounts.google.com;
+    img-src 'self' data: https://*.googleusercontent.com https://*.gstatic.com https://*.google.com;
+    connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com;
+    frame-src https://accounts.google.com https://docs.google.com https://drive.google.com;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none';
+  ">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <title>Net Worth</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="demo-banner" class="demo-banner" hidden>Demo mode — local fixture, nothing is sent to Google</div>
+
+  <header class="bar">
+    <div class="bar-title">
+      <span class="logo" aria-hidden="true">📈</span>
+      <div>
+        <div class="app-name">Net Worth</div>
+        <div class="bar-sub"><span id="sheet-name"></span> <span id="who" class="muted"></span></div>
+      </div>
+    </div>
+    <div id="bar-actions" class="bar-actions" hidden>
+      <button id="btn-refresh" class="btn" title="Reload from the sheet">↻ Refresh</button>
+      <details class="menu">
+        <summary class="btn">⋯</summary>
+        <div class="menu-pop">
+          <button id="btn-switch">Choose a different sheet</button>
+          <button id="btn-disconnect">Revoke Google access</button>
+          <button id="btn-signout">Sign out</button>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="v-setup" class="center card" hidden>
+      <h1>Almost there</h1>
+      <p id="setup-msg">Add your Google OAuth client ID, API key and project number to <code>js/config.js</code>. The README walks through it step by step.</p>
+    </section>
+
+    <section id="v-signin" class="center card" hidden>
+      <h1>Your net worth, from your own sheet</h1>
+      <p>Sign in with Google to open it. The data stays in your Google Sheet: this page stores nothing, and forgets everything when you close it.</p>
+      <button id="btn-signin" class="btn primary big-btn">Sign in with Google</button>
+    </section>
+
+    <section id="v-pick" class="center card" hidden>
+      <h1>Choose your sheet</h1>
+      <p>Pick your net worth spreadsheet. The app only gets access to the one file you choose — nothing else in your Drive.</p>
+      <button id="btn-pick" class="btn primary big-btn">Choose from Google Drive</button>
+    </section>
+
+    <section id="v-loading" class="center" hidden>
+      <div class="spinner" aria-label="Loading"></div>
+    </section>
+
+    <div id="v-main" hidden>
+      <div id="dash"></div>
+    </div>
+  </main>
+
+  <dialog id="dlg" class="dlg"><div class="dlg-body"></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

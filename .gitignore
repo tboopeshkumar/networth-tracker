@@ -1,0 +1,17 @@
+# ---- Personal data: never commit (also enforced by tools/hooks/pre-commit) ----
+demo/
+*.xlsx
+*.xls
+*.ods
+*.csv
+*.tsv
+data.json
+networth-dashboard*.html
+
+# ---- Local clutter ----
+.DS_Store
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.log
