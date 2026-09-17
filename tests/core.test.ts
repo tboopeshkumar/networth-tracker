@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'vitest';
 
+import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
@@ -42,6 +43,17 @@ test('parseRef reads single-cell references', () => {
   assert.deepEqual(parseRef("='It''s'!$AB$2"), { tab: "It's", row: 1, col: 27 });
   assert.equal(parseRef('=SUM(A1:A5)'), null);
   assert.equal(parseRef(1000), null);
+});
+
+test('access lists decide what the UI offers', () => {
+  const lists = { allowed: ['owner@example.com', 'viewer@example.com'], editors: ['owner@example.com'] };
+  assert.deepEqual(accessFor('owner@example.com', lists), { allowed: true, canEdit: true });
+  assert.deepEqual(accessFor('viewer@example.com', lists), { allowed: true, canEdit: false });
+  assert.deepEqual(accessFor('stranger@example.com', lists), { allowed: false, canEdit: false });
+  // case and spacing shouldn't matter
+  assert.deepEqual(accessFor('  Owner@Example.com ', lists), { allowed: true, canEdit: true });
+  // empty lists mean no restriction at this level
+  assert.deepEqual(accessFor('anyone@example.com', { allowed: [], editors: [] }), { allowed: true, canEdit: true });
 });
 
 /* ---------- model ---------- */

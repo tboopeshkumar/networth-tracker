@@ -9,8 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fixture": "python3 tools/make_fixture.py",
-    "hash-email": "node tools/hash-email.mjs"
+    "fixture": "python3 tools/make_fixture.py"
   },
   "dependencies": {
     "react": "^19.3.0",

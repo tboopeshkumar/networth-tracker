@@ -51,18 +51,16 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
           VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
-          VITE_ALLOWED_EMAIL_HASHES: ${{ vars.VITE_ALLOWED_EMAIL_HASHES }}
-          VITE_EDITOR_EMAIL_HASHES: ${{ vars.VITE_EDITOR_EMAIL_HASHES }}
+          VITE_ALLOWED_EMAILS: ${{ vars.VITE_ALLOWED_EMAILS }}
+          VITE_EDITOR_EMAILS: ${{ vars.VITE_EDITOR_EMAILS }}
           VITE_IDLE_MINUTES: ${{ vars.VITE_IDLE_MINUTES }}
         run: npm run build
 
-      # The published site must contain code only
+      # The published site must contain code and configuration only — no
+      # spreadsheet data. (The configured email addresses are expected here.)
       - name: Check the build holds no data
         run: |
           if grep -rqE '__demo|fixture\.json' dist; then echo "::error::Demo code or fixture in build"; exit 1; fi
-          if grep -rqE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}' dist; then
-            echo "::error::An email address is in the build — use hashes (npm run hash-email)"; exit 1
-          fi
           if ! grep -q 'Content-Security-Policy' dist/index.html; then echo "::error::CSP missing from build"; exit 1; fi
 
       - uses: actions/upload-pages-artifact@v5

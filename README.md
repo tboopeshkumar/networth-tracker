@@ -27,14 +27,14 @@ The site is public. Your data is not. Anyone can load the page and read its Java
 Also:
 
 - **Token in memory only.** It is never written to localStorage or cookies. Reloading the tab signs you out, and the app locks itself after 20 idle minutes.
-- **Nothing sensitive in git or in the build.** Configuration lives in `.env.local` and GitHub repository variables. Email addresses are stored only as hashes. A pre-commit hook blocks data files, `.env.local`, email addresses, sheet URLs and OAuth client secrets, and the deploy workflow checks that the built site contains no data.
+- **No spreadsheet data in git or in the build.** Configuration lives in `.env.local` and GitHub repository variables, never in the code. A pre-commit hook blocks data files, `.env.local`, hardcoded email addresses, sheet URLs and OAuth client secrets, and the deploy workflow checks the built site carries no data.
 - **Strict Content-Security-Policy** in production. Only this site's scripts and Google's sign-in and Picker libraries can run, and only Google APIs can be contacted. There are no inline scripts and no `eval`.
 - **Escaped output.** React escapes every value read from the sheet, so a cell can't inject code.
 - **Safe writes.** Before writing, the app re-reads the sheet, finds each target row by its content rather than its row number, and checks the value is still what you reviewed. If anything changed, nothing is written. All changes in one save go out as a single atomic `batchUpdate`.
 
-**Why a public client ID and API key are fine:** browser apps use no client secret. Google only accepts sign-ins that start from the *Authorized JavaScript origins* you register, and the API key is restricted to your site and the Picker API. Everything in `VITE_*` variables ends up in the published JavaScript, which is exactly why email addresses are hashed.
+**Everything in `VITE_*` is public.** Vite copies those values into the JavaScript it publishes, so treat the whole file as readable by anyone who opens the site — including the configured email addresses. That's safe for what's there: browser apps use no client secret, Google only accepts sign-ins from the *Authorized JavaScript origins* you register, the API key is restricted to your site and the Picker API, and the email lists decide nothing about who can reach your data.
 
-**The honest limits:** a hash hides an address from casual readers, but someone who already suspects a specific address could check it against the hash. And the app is only as safe as your Google account and your unlocked devices, so use 2-step verification.
+**The honest limit:** the app is only as safe as your Google account and your unlocked devices, so use 2-step verification.
 
 **Revoke access anytime:** in the app, open ⋯ → *Revoke Google access*, or visit [myaccount.google.com/connections](https://myaccount.google.com/connections).
 
@@ -44,9 +44,9 @@ Also:
 |---|---|
 | Sign in at all | Add them as a **test user** (Google Auth Platform → Audience) |
 | See the data | **Share the sheet** with them in Google Sheets |
-| Only view, not write | Share as **Viewer**, which Google enforces, and leave them out of `VITE_EDITOR_EMAIL_HASHES`, which hides the Edit buttons |
+| Only view, not write | Share as **Viewer**, which Google enforces, and leave them out of `VITE_EDITOR_EMAILS`, which hides the Edit buttons |
 
-`VITE_ALLOWED_EMAIL_HASHES` is optional. It only replaces Google's refusal with a friendlier message, so leaving it empty is perfectly fine.
+`VITE_ALLOWED_EMAILS` is optional. It only replaces Google's refusal with a friendlier message, so leaving it empty is perfectly fine.
 
 ---
 
@@ -94,13 +94,12 @@ Keep the app in **Testing**: the test-user list is a gate that Google enforces.
 cp .env.example .env.local
 ```
 
-Fill in `.env.local` with the client ID, API key and project number. For the email lists, generate hashes:
+Fill in `.env.local` with the client ID, API key and project number. `VITE_ALLOWED_EMAILS` and `VITE_EDITOR_EMAILS` take comma-separated addresses:
 
-```bash
-npm run hash-email -- you@gmail.com partner@example.com
 ```
-
-It prints one comma-separated line to paste into `VITE_ALLOWED_EMAIL_HASHES` or `VITE_EDITOR_EMAIL_HASHES`.
+VITE_ALLOWED_EMAILS=you@gmail.com,partner@example.com
+VITE_EDITOR_EMAILS=you@gmail.com
+```
 
 ### 5. GitHub
 
@@ -113,8 +112,8 @@ It prints one comma-separated line to paste into `VITE_ALLOWED_EMAIL_HASHES` or 
    | `VITE_GOOGLE_CLIENT_ID` | yes |
    | `VITE_GOOGLE_API_KEY` | yes |
    | `VITE_GOOGLE_APP_ID` | yes |
-   | `VITE_ALLOWED_EMAIL_HASHES` | no |
-   | `VITE_EDITOR_EMAIL_HASHES` | no |
+   | `VITE_ALLOWED_EMAILS` | no |
+   | `VITE_EDITOR_EMAILS` | no |
    | `VITE_IDLE_MINUTES` | no (default 20) |
 
 4. Push:
@@ -179,7 +178,6 @@ The fixture (`demo/fixture.json`) holds your real data. It is gitignored and blo
 | `npm test` | Unit and render tests (Vitest) |
 | `npm run typecheck` | TypeScript only |
 | `npm run fixture -- <xlsx>` | Build the local demo fixture |
-| `npm run hash-email -- <email…>` | Hashes for the access lists |
 
 ### Keeping your data out of the repo
 
@@ -231,11 +229,11 @@ src/
     checks.ts, links.ts      "Worth a look" rules; Net Worth → holdings links
     sheets.ts, demoSheets.ts Google Sheets client; in-memory dev backend
     auth.ts, picker.ts       Google sign-in (token in memory) and Picker
-    access.ts, format.ts     hashed access lists; money, date and A1 helpers
+    access.ts, format.ts     who may view/edit; money, date and A1 helpers
   styles/app.css             colour-blind-safe palette, light and dark
 tests/                       Vitest; most tests need the local fixture
 apps-script/NavFeed.gs       daily AMFI NAVs, runs inside the sheet
-tools/                       fixture builder, email hasher, git hooks
+tools/                       fixture builder, git hooks
 .github/workflows/deploy.yml build, test, check and publish
 ```
 

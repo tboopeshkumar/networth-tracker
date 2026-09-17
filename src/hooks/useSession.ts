@@ -94,7 +94,7 @@ export function useSession(toast: Toast) {
     setBusy(true);
     signIn()
       .then(async (email) => {
-        const access = await accessFor(email, { allowed: CONFIG.allowedHashes, editors: CONFIG.editorHashes });
+        const access = accessFor(email, { allowed: CONFIG.allowedEmails, editors: CONFIG.editorEmails });
         if (!access.allowed) {
           signOut();
           throw new Error(`${email} isn't set up for this app.`);
