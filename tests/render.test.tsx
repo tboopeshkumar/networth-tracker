@@ -34,7 +34,7 @@ test('summary renders without a sheet-specific layout', async () => {
   if (!existsSync(FIX)) return;
   const { model } = await loadAll(new DemoSheets(JSON.parse(readFileSync(FIX, 'utf8')) as Fixture));
   const html = renderToStaticMarkup(<Summary model={model} />);
-  for (const label of ['Total net worth', 'Invested', 'Gain', 'Liquid cash', 'Equity exposure', 'Held in UAE']) {
+  for (const label of ['Invested capital', 'now worth', 'Unrealised', 'Liquid cash', 'Equity exposure', 'Held in UAE']) {
     assert.ok(html.includes(label), label);
   }
 });
