@@ -1,0 +1,203 @@
+// What each holdings section shows. One record list feeds both
+// presentations: `columns` for the wide table, `card` for phones.
+
+import type { ReactNode } from 'react';
+import type { EditRequest, EditableRow } from '../../lib/editors';
+import {
+  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone,
+} from '../../lib/format';
+import type { ViewId } from '../../lib/links';
+import type { Ledger, Model, Row, RowOf } from '../../lib/model';
+
+export interface Column<R> {
+  head: string;
+  num?: boolean;
+  /** the row's name column: wraps, and is styled as the primary text */
+  name?: boolean;
+  render: (r: R) => ReactNode;
+  className?: (r: R) => string;
+}
+
+export interface CardContent {
+  title: ReactNode;
+  value: ReactNode;
+  sub?: ReactNode;
+  right?: { text: string; tone?: string };
+  foot?: ReactNode;
+}
+
+export interface View<R extends Row = Row> {
+  id: ViewId;
+  group: string;
+  name: string;
+  total: string;
+  recs: R[];
+  columns: Column<R>[];
+  card: (r: R) => CardContent;
+  /** present when rows can be edited */
+  edit?: (r: R) => EditRequest;
+  ledger?: Ledger;
+}
+
+const text = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : String(v));
+const sum = (recs: Row[], f: string) => recs.reduce((a, r) => a + n0(r[f]), 0);
+const gain = (pnl: unknown, inv: unknown) => ({ text: pnl ? `${signedCr(pnl)} · ${signedPct(ret(pnl, inv))}` : '—', tone: tone(pnl) });
+const fdStatus = (r: RowOf<'fd'>): [string, string] =>
+  (!isNum(r.maturityDate) ? ['no date', 'down'] : r.maturityDate < todaySerial() ? ['matured', 'down'] : ['active', '']);
+
+const editRow = (id: EditableRow) => (r: Row): EditRequest => ({ kind: 'row', id, key: r._key });
+
+// Erases the per-view record type so views can share one array.
+const view = <R extends Row>(v: View<R>) => v as unknown as View;
+
+export function buildViews(model: Model): View[] {
+  const R = model.rows;
+  const views: View[] = [
+    view<RowOf<'mf'>>({
+      id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: cr(sum(R.mf, 'current')),
+      edit: editRow('mf'),
+      columns: [
+        { head: 'Fund', name: true, render: (r) => <>{text(r.fund)}<div className="sub2">{text(r.platform)}</div></> },
+        { head: 'Holder', render: (r) => text(r.holder) },
+        { head: 'Type', render: (r) => text(r.category) },
+        { head: 'Invested', num: true, render: (r) => inr(r.invested) },
+        { head: 'Current', num: true, render: (r) => inr(r.current), className: () => 'strong' },
+        { head: 'P&L', num: true, render: (r) => signedInr(r.pnl), className: (r) => tone(r.pnl) },
+        { head: 'Return', num: true, render: (r) => signedPct(ret(r.pnl, r.invested)), className: (r) => tone(r.pnl) },
+        { head: 'NAV date', render: (r) => fmtDate(r.navDate) },
+      ],
+      card: (r) => ({
+        title: text(r.fund), value: inr(r.current), sub: join(r.holder, r.category, r.platform),
+        right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDate(r.navDate)}`,
+      }),
+    }),
+    view<RowOf<'equity'>>({
+      id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, total: cr(sum(R.equity, 'currentInr')),
+      edit: editRow('equity'),
+      columns: [
+        { head: 'Account', name: true, render: (r) => <>{text(r.account)}<div className="sub2">{text(r.details)}</div></> },
+        { head: 'Cur.', render: (r) => text(r.currency || 'INR') },
+        { head: 'Current (local)', num: true, render: (r) => (isNum(r.currentLocal) ? num(r.currentLocal, 0) : '—') },
+        { head: 'Invested (INR)', num: true, render: (r) => inr(r.investedInr) },
+        { head: 'Current (INR)', num: true, render: (r) => inr(r.currentInr), className: () => 'strong' },
+        { head: 'P&L', num: true, render: (r) => signedInr(r.pnl), className: (r) => tone(r.pnl) },
+        { head: 'Return', num: true, render: (r) => signedPct(ret(r.pnl, r.investedInr)), className: (r) => tone(r.pnl) },
+        { head: 'Priced', render: (r) => fmtDate(r.navDate) },
+      ],
+      card: (r) => ({
+        title: text(r.account), value: inr(r.currentInr), sub: text(r.details || r.currency || 'INR'),
+        right: gain(r.pnl, r.investedInr),
+        foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDate(r.navDate)}`),
+      }),
+    }),
+    view<RowOf<'sgb'>>({
+      id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: cr(sum(R.sgb, 'market')),
+      edit: editRow('sgb'),
+      columns: [
+        { head: 'Holding', name: true, render: (r) => text(r.holding) },
+        { head: 'Holder', render: (r) => text(r.holder) },
+        { head: 'Qty (g)', num: true, render: (r) => num(r.qty) },
+        { head: 'Cost', num: true, render: (r) => inr(r.cost) },
+        { head: 'Market', num: true, render: (r) => inr(r.market), className: () => 'strong' },
+        { head: 'Gain', num: true, render: (r) => signedInr(n0(r.market) - n0(r.cost)), className: (r) => tone(n0(r.market) - n0(r.cost)) },
+        { head: 'Matures', render: (r) => fmtDate(r.maturity) },
+        { head: 'Valued', render: (r) => fmtDate(r.valueDate) },
+      ],
+      card: (r) => ({
+        title: text(r.holding), value: inr(r.market), sub: join(r.holder, `${num(r.qty)} g`),
+        right: gain(n0(r.market) - n0(r.cost), r.cost), foot: `Cost ${cr(r.cost)} · matures ${fmtDate(r.maturity)}`,
+      }),
+    }),
+    view<RowOf<'fd'>>({
+      id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, total: cr(sum(R.fd, 'amount')),
+      edit: editRow('fd'),
+      columns: [
+        { head: 'Institution', name: true, render: (r) => <>{text(r.institution)}<div className="sub2">{r.ref ? String(r.ref) : ''}</div></> },
+        { head: 'Holder', render: (r) => text(r.holder) },
+        { head: 'Amount', num: true, render: (r) => inr(r.amount), className: () => 'strong' },
+        { head: 'At maturity', num: true, render: (r) => inr(r.maturityAmount) },
+        { head: 'Rate', num: true, render: (r) => (isNum(r.rate) ? `${r.rate}%` : '—') },
+        { head: 'Matures', render: (r) => fmtDate(r.maturityDate) },
+        { head: 'Status', render: (r) => fdStatus(r)[0], className: (r) => fdStatus(r)[1] },
+      ],
+      card: (r) => {
+        const [status, statusTone] = fdStatus(r);
+        return {
+          title: text(r.institution), value: inr(r.amount), sub: join(r.holder, isNum(r.rate) ? `${r.rate}%` : ''),
+          right: { text: status, tone: statusTone },
+          foot: join(`Matures ${fmtDate(r.maturityDate)}`, isNum(r.maturityAmount) ? `${cr(r.maturityAmount)} at maturity` : ''),
+        };
+      },
+    }),
+    view<RowOf<'bankInr'>>({
+      id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: cr(sum(R.bankInr, 'balance')),
+      edit: editRow('bankInr'),
+      columns: [
+        { head: 'Account', name: true, render: (r) => text(r.account) },
+        { head: 'Holder', render: (r) => text(r.holder) },
+        { head: 'Balance (INR)', num: true, render: (r) => inr(r.balance), className: () => 'strong' },
+      ],
+      card: (r) => ({ title: text(r.account), value: inr(r.balance), sub: text(r.holder) }),
+    }),
+    view<RowOf<'bankAed'>>({
+      id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: R.bankAed, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
+      edit: editRow('bankAed'),
+      columns: [
+        { head: 'Account', name: true, render: (r) => text(r.account) },
+        { head: 'Holder', render: (r) => text(r.holder) },
+        { head: 'Balance (AED)', num: true, render: (r) => `AED ${num(r.balance, 0)}`, className: () => 'strong' },
+      ],
+      card: (r) => ({ title: text(r.account), value: `AED ${num(r.balance, 0)}`, sub: text(r.holder) }),
+    }),
+    ...(['goldUae', 'silverUae'] as const).map((id) => {
+      const unit = id === 'goldUae' ? 'g' : 'oz';
+      return view<RowOf<typeof id>>({
+        id, group: 'Metals · UAE', name: id === 'goldUae' ? 'Gold (UAE)' : 'Silver (UAE)',
+        recs: R[id], total: `${num(sum(R[id], 'qty'))} ${unit}`,
+        columns: [
+          { head: 'Bought', render: (r) => fmtDate(r.date) },
+          { head: 'Source', render: (r) => text(r.source) },
+          { head: `AED / ${unit}`, num: true, render: (r) => num(r.perUnit) },
+          { head: `Qty (${unit})`, num: true, render: (r) => num(r.qty) },
+          { head: 'Cost (AED)', num: true, render: (r) => num(r.cost), className: () => 'strong' },
+        ],
+        card: (r) => ({
+          title: `${num(r.qty)} ${unit}`, value: `AED ${num(r.cost)}`, sub: join(fmtDate(r.date), r.source),
+          foot: `AED ${num(r.perUnit)} per ${unit === 'g' ? 'gram' : 'ounce'}`,
+        }),
+      });
+    }),
+  ];
+
+  if (R.givenOut.length) {
+    views.push(view<RowOf<'givenOut'>>({
+      id: 'givenOut', group: 'Money lent', name: 'Receivables', recs: R.givenOut, total: cr(sum(R.givenOut, 'amount')),
+      columns: [
+        { head: 'Person', name: true, render: (r) => text(r.person) },
+        { head: 'Given on', render: (r) => fmtDate(r.date) },
+        { head: 'Amount', num: true, render: (r) => inr(r.amount), className: () => 'strong' },
+        { head: 'Status', render: (r) => text(r.status) },
+      ],
+      card: (r) => ({ title: text(r.person), value: inr(r.amount), sub: `Given ${fmtDate(r.date)}`, right: { text: String(r.status ?? '') } }),
+    }));
+  }
+
+  // One section per family-loan ledger. Negative amounts are money received back.
+  for (const L of Object.values(model.ledgers)) {
+    const notes = (r: Row) => join(r.note, r.detail, r.interest);
+    views.push(view({
+      id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, total: cr(L.balance), ledger: L,
+      columns: [
+        { head: 'Date', render: (r) => fmtDate(r.date) },
+        { head: 'Description', name: true, render: (r) => text(r.description) },
+        { head: 'Amount', num: true, render: (r) => signedAmt(r.amount), className: (r) => (n0(r.amount) < 0 ? 'up' : 'strong') },
+        { head: 'Note', render: (r) => notes(r) || '—' },
+      ],
+      card: (r) => ({ title: text(r.description), value: signedAmt(r.amount), sub: fmtDate(r.date), foot: notes(r) }),
+    }));
+  }
+
+  return views;
+}
+
+export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent'];

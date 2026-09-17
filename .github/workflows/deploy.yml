@@ -1,0 +1,83 @@
+name: Deploy to GitHub Pages
+
+# Builds on every push to main and publishes dist/ to GitHub Pages.
+# Configuration comes from repository variables (Settings → Secrets and
+# variables → Actions → Variables); see .env.example for the names.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Typecheck runs as part of the build; tests that need the private
+      # fixture skip themselves here.
+      - run: npm test
+
+      - name: Check configuration
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
+        run: |
+          missing=0
+          for v in VITE_GOOGLE_CLIENT_ID VITE_GOOGLE_API_KEY VITE_GOOGLE_APP_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Repository variable $v is not set"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
+          VITE_ALLOWED_EMAIL_HASHES: ${{ vars.VITE_ALLOWED_EMAIL_HASHES }}
+          VITE_EDITOR_EMAIL_HASHES: ${{ vars.VITE_EDITOR_EMAIL_HASHES }}
+          VITE_IDLE_MINUTES: ${{ vars.VITE_IDLE_MINUTES }}
+        run: npm run build
+
+      # The published site must contain code only
+      - name: Check the build holds no data
+        run: |
+          if grep -rqE '__demo|fixture\.json' dist; then echo "::error::Demo code or fixture in build"; exit 1; fi
+          if grep -rqE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}' dist; then
+            echo "::error::An email address is in the build — use hashes (npm run hash-email)"; exit 1
+          fi
+          if ! grep -q 'Content-Security-Policy' dist/index.html; then echo "::error::CSP missing from build"; exit 1; fi
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

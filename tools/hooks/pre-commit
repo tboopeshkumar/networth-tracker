@@ -9,6 +9,9 @@ while IFS= read -r f; do
     demo/*|*.xlsx|*.xls|*.ods|*.csv|*.tsv|data.json|*fixture*.json|networth-dashboard*.html)
       echo "✖ refusing to commit $f — it can contain your financial data"
       fail=1 ;;
+    .env|.env.local|.env.*.local|dist/*)
+      echo "✖ refusing to commit $f — local config and build output stay out of git"
+      fail=1 ;;
   esac
 done < <(git diff --cached --name-only --diff-filter=ACMR)
 

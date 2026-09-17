@@ -8,6 +8,14 @@ demo/
 data.json
 networth-dashboard*.html
 
+# ---- Local config (Google IDs, email hashes) — use .env.example as the template ----
+.env
+.env.local
+.env.*.local
+
+# ---- Build output ----
+dist/
+
 # ---- Local clutter ----
 .DS_Store
 node_modules/
@@ -15,3 +23,6 @@ node_modules/
 venv/
 __pycache__/
 *.log
+
+# ---- Editor / agent tooling ----
+.claude/
