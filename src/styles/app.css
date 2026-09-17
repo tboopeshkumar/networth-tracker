@@ -117,6 +117,49 @@ section.card { margin-bottom: 14px; }
 .center { max-width: 460px; margin: 12vh auto 0; text-align: center; }
 .center p { color: var(--ink-2); margin: 0 0 20px; }
 
+/* ---------- summary: hero figure + composition tiles ---------- */
+.hero-card { margin-bottom: 12px; }
+.hero-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.hero-head .label { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.hero-asof { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.hero-figure { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+.hero-value { font-size: 38px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.05; }
+.hero-chip { font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, currentColor 11%, transparent); white-space: nowrap; }
+.hero-chip .muted { font-weight: 400; }
+.hero-secondary { display: inline-flex; align-items: baseline; gap: 7px; font-size: 15px; }
+.hero-secondary b { font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+.spark-cap { font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+.hero-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; margin-top: 10px; }
+.hero-facts .muted { font-size: 12px; }
+.hero-exact { margin-left: auto; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .hero-value { font-size: 30px; }
+  .hero-exact { display: none; }
+}
+
+.spark { margin-top: 12px; }
+.spark svg { display: block; width: 100%; }
+.spark-line { fill: none; stroke: var(--s1); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.spark-area { fill: color-mix(in srgb, var(--s1) 10%, transparent); stroke: none; }
+.spark-dot { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+
+.shares { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.share-tile .label { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.share-val { font-size: 21px; font-weight: 600; letter-spacing: -0.015em; margin-top: 5px; }
+.share-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+.share-pct { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 42px; }
+.share-track { flex: 1; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.share-fill { display: block; height: 100%; border-radius: 3px; }
+@media (max-width: 560px) {
+  .share-val { font-size: 17px; }
+  /* stack the bar under the percentage; flex:1 would collapse its height here */
+  .share-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .share-track { flex: none; width: 100%; }
+  .share-pct { min-width: 0; }
+  /* reserve two lines for the label so all three values sit at the same height */
+  .share-tile .label { min-height: 34px; min-height: 2lh; }
+}
+
 .tile .label { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
 .tile .big { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-top: 6px; line-height: 1.15; }
 .tile .mid { font-size: 21px; font-weight: 600; letter-spacing: -0.015em; margin-top: 6px; }

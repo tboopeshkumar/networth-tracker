@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'vitest';
 
 import { Positions } from '../src/components/dashboard/Positions';
-import { StatTiles } from '../src/components/dashboard/StatTiles';
+import { Summary } from '../src/components/dashboard/Summary';
 import { DemoSheets, type Fixture } from '../src/lib/demoSheets';
 import { makeLinker } from '../src/lib/links';
 import { loadAll } from '../src/lib/writer';
@@ -30,11 +30,11 @@ test('sheet text is escaped, never interpreted as markup', async () => {
   assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'the text is shown literally');
 });
 
-test('summary tiles render without a sheet-specific layout', async () => {
+test('summary renders without a sheet-specific layout', async () => {
   if (!existsSync(FIX)) return;
   const { model } = await loadAll(new DemoSheets(JSON.parse(readFileSync(FIX, 'utf8')) as Fixture));
-  const html = renderToStaticMarkup(<StatTiles model={model} />);
-  for (const label of ['Invested', 'Total net worth', 'Unrealised P&amp;L', 'Overall return']) {
+  const html = renderToStaticMarkup(<Summary model={model} />);
+  for (const label of ['Total net worth', 'Invested', 'Gain', 'Liquid cash', 'Equity exposure', 'Held in UAE']) {
     assert.ok(html.includes(label), label);
   }
 });

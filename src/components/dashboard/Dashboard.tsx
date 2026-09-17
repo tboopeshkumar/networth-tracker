@@ -9,7 +9,7 @@ import { Checks } from './Checks';
 import { Holdings } from './Holdings';
 import { Positions } from './Positions';
 import { RatesInputs } from './RatesInputs';
-import { StatTiles } from './StatTiles';
+import { Summary } from './Summary';
 
 interface Props {
   loaded: Loaded;
@@ -58,7 +58,7 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
 
   return (
     <>
-      <StatTiles model={model} />
+      <Summary model={model} />
       <Positions model={model} linkOf={linkOf} onDrill={drill} />
       <Holdings model={model} canEdit={canEdit} onEdit={onEdit}
         open={open} onToggle={toggle} flash={flash} sectionRef={sectionRef} />
