@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 
-import { buildModel, totalDrift, TABS } from '../js/model.js';
+import { buildModel, parseRef, totalDrift, TABS } from '../js/model.js';
 import { DemoSheets, shiftRows } from '../js/sheets.js';
 import { execute, loadAll, planRowEdit, planInsert, planMetalPurchase, planCellEdit, V, ConflictError } from '../js/writer.js';
 import { esc, html } from '../js/util.js';
@@ -75,6 +75,51 @@ test('model reads every section of the layout', { skip }, () => {
   for (const id of ['fxAedInr', 'fxUsdAed', 'npsInvested', 'npsGain']) {
     assert.equal(typeof m.cells[id]?.value, 'number', `${id} found`);
   }
+});
+
+test('parseRef reads single-cell references', () => {
+  assert.deepEqual(parseRef("='Some Tab'!$C$13"), { tab: 'Some Tab', row: 12, col: 2 });
+  assert.deepEqual(parseRef('=Tab!D18'), { tab: 'Tab', row: 17, col: 3 });
+  assert.deepEqual(parseRef("='It''s'!$AB$2"), { tab: "It's", row: 1, col: 27 });
+  assert.equal(parseRef('=SUM(A1:A5)'), null);
+  assert.equal(parseRef(1000), null);
+});
+
+test('receivables and family-loan ledgers are found and linked', { skip }, async () => {
+  const { model, data } = await loadAll(new DemoSheets(fixture()));
+  const ledgers = Object.values(model.ledgers);
+
+  // Every ledger tab named in Receivables was read, and sums to its own total
+  for (const f of model.rows.familyLoans) {
+    if (data.values[f.detailSheet]) assert.ok(model.ledgers[f.detailSheet], `${f.detailSheet} parsed`);
+  }
+  for (const L of ledgers) {
+    approx(sum(L.rows, 'amount'), L.balance, `${L.sheet} rows vs net balance`);
+    assert.match(L.balanceRef, /^'.+'!C\d+$/);
+  }
+
+  // Net Worth lines that reference a family-loan row resolve to that row's ledger
+  const famRows = new Set(model.rows.familyLoans.map((f) => f._row));
+  for (const r of model.rows.networth.filter((x) => x._src?.tab === 'Receivables')) {
+    if (famRows.has(r._src.row)) {
+      const f = model.rows.familyLoans.find((x) => x._row === r._src.row);
+      approx(r.current, f.balance, 'net worth line equals the family-loan balance it references');
+    } else {
+      approx(r.current, sum(model.rows.givenOut, 'amount'), 'given-out line equals the list total');
+    }
+  }
+});
+
+test('linking a family loan to its ledger writes a formula to the right cell', { skip }, async () => {
+  const demo = new DemoSheets(fixture());
+  const { model } = await loadAll(demo);
+  const L = Object.values(model.ledgers)[0];
+  if (!L) return;
+  const rec = model.rows.familyLoans.find((r) => r._key === L.familyKey);
+  await execute(demo, planRowEdit(model, 'familyLoans', rec, { balance: { value: V.formula(`=${L.balanceRef}`), display: '' } }, 'Link'));
+
+  const { data } = await loadAll(demo);
+  assert.equal(data.formulas.Receivables[rec._row][model.tables.familyLoans.cols.balance], `=${L.balanceRef}`);
 });
 
 test('every tab the app reads exists', { skip }, () => {

@@ -20,7 +20,13 @@
     base-uri 'none';
     form-action 'none';
   ">
-  <meta name="referrer" content="no-referrer">
+  <!--
+    Send only this site's origin (never the path or query) with requests.
+    Not "no-referrer": the API key is restricted to this website, and Google
+    checks that restriction against the referrer — with none, the Picker
+    rejects the key as "invalid".
+  -->
+  <meta name="referrer" content="strict-origin">
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light dark">
   <title>Net Worth</title>
@@ -39,10 +45,13 @@
       </div>
     </div>
     <div id="bar-actions" class="bar-actions" hidden>
-      <button id="btn-refresh" class="btn" title="Reload from the sheet">↻ Refresh</button>
+      <button id="btn-refresh" class="btn" title="Reload from the sheet" aria-label="Reload from the sheet">
+        <span aria-hidden="true">↻</span><span class="btn-label"> Refresh</span>
+      </button>
       <details class="menu">
-        <summary class="btn">⋯</summary>
+        <summary class="btn" aria-label="More">⋯</summary>
         <div class="menu-pop">
+          <div class="menu-account">Signed in as <b id="who-menu"></b></div>
           <button id="btn-switch">Choose a different sheet</button>
           <button id="btn-disconnect">Revoke Google access</button>
           <button id="btn-signout">Sign out</button>

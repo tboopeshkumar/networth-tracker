@@ -9,7 +9,7 @@ import { html, mount } from './util.js';
 
 const $ = (s) => document.querySelector(s);
 const VIEWS = ['setup', 'signin', 'pick', 'loading', 'main'];
-const state = { adapter: null, model: null, data: null, title: '' };
+const state = { adapter: null, model: null, data: null, title: '', canEdit: true };
 
 const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const DEMO = isLocal && new URLSearchParams(location.search).has('demo');
@@ -31,9 +31,10 @@ function toast(msg, kind = 'ok') {
 // Drop the token and every trace of the data from the page.
 function lock(message) {
   signOut();
-  Object.assign(state, { adapter: null, model: null, data: null, title: '' });
+  Object.assign(state, { adapter: null, model: null, data: null, title: '', canEdit: true });
   $('#dash').replaceChildren();
   $('#who').textContent = '';
+  $('#who-menu').textContent = '';
   $('#sheet-name').textContent = '';
   const dlg = $('#dlg');
   if (dlg.open) dlg.close();
@@ -73,7 +74,13 @@ async function afterSignIn() {
     signOut();
     throw new Error(`${email} isn't set up for this app.`);
   }
+  // UI-level role. The real limit on writing is the sheet's own sharing:
+  // a Viewer's write is refused by Google with a 403.
+  const editors = CONFIG.editors.map((e) => e.toLowerCase());
+  state.canEdit = !editors.length || editors.includes(email.toLowerCase());
+
   $('#who').textContent = email;
+  $('#who-menu').textContent = state.canEdit ? email : `${email} (view only)`;
   const sheet = rememberedSheet(email);
   if (sheet) await openSheet(sheet);
   else show('pick');
@@ -129,9 +136,13 @@ $('#btn-disconnect').addEventListener('click', () => {
 $('#dash').addEventListener('click', (e) => {
   const el = e.target.closest('[data-edit], [data-add]');
   if (!el || !state.model) return;
+  if (!state.canEdit) { toast('This account has view-only access.', 'err'); return; }
   if (!DEMO && !getToken()) { lock('Your session expired — sign in again to continue.'); return; }
   const d = el.dataset;
-  const request = d.add ? { add: d.add } : d.edit === 'cell' ? { path: d.path.split('.') } : { id: d.id, key: d.key };
+  const request = d.add ? { add: d.add }
+    : d.edit === 'cell' ? { path: d.path.split('.') }
+      : d.edit === 'link' ? { link: d.sheet }
+        : { id: d.id, key: d.key };
   openEditor($('#dlg'), state, request, {
     onWrite: async (plan) => {
       await execute(state.adapter, plan);
@@ -159,8 +170,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) idle
 
 (async () => {
   if (DEMO) {
+    // ?demo&viewer previews the read-only view that non-editor accounts get
+    state.canEdit = !new URLSearchParams(location.search).has('viewer');
     $('#demo-banner').hidden = false;
     $('#who').textContent = 'demo';
+    $('#who-menu').textContent = state.canEdit ? 'demo mode' : 'demo mode (view only)';
     try {
       state.adapter = await DemoSheets.load();
       await load();

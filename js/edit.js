@@ -255,6 +255,30 @@ function addDef(model, id) {
   throw new Error(`Nothing to add for ${id}`);
 }
 
+// Replace a family loan's typed balance in Receivables with a formula that
+// points at its ledger's Net Balance, so the two can't drift apart again.
+function linkLedgerDef(model, sheet) {
+  const L = model.ledgers[sheet];
+  const rec = L && model.rows.familyLoans.find((r) => r._key === L.familyKey);
+  if (!L || !rec || !L.balanceRef) throw new Error('That ledger is no longer in the sheet. Refresh and try again.');
+  const formula = `=${L.balanceRef}`;
+  const title = `Link ${L.title} to its ledger`;
+  const diff = L.balance - rec.balance;
+  return {
+    title,
+    hint: `Replaces the typed balance in Receivables with a formula pointing at the ledger’s Net Balance (${L.balanceRef}). Net Worth then follows the ledger automatically.`,
+    fields: [],
+    build() {
+      const plan = planRowEdit(model, 'familyLoans', rec, {
+        balance: { value: V.formula(formula), display: `${formula}  →  ${inr(L.balance)}` },
+      }, title);
+      plan.changes[0].where = 'Balance';
+      plan.changes[0].before = inr(rec.balance);
+      return { plan, warn: [`Your net worth changes by ${diff > 0 ? '+' : '−'}${inr(Math.abs(diff))} once this is saved.`] };
+    },
+  };
+}
+
 /* ---------- dialog ---------- */
 
 function inputFor(f) {
@@ -278,6 +302,7 @@ export function openEditor(dialog, state, request, { onWrite }) {
   let def;
   try {
     def = request.add ? addDef(model, request.add)
+      : request.link ? linkLedgerDef(model, request.link)
       : request.path ? cellEditDef(model, request.path)
         : rowEditDef(model, data, request.id, model.rows[request.id].find((r) => r._key === request.key));
   } catch (e) {

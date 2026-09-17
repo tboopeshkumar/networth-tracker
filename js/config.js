@@ -17,10 +17,19 @@
 // It is not a security boundary: page code can be edited in the browser.
 
 export const CONFIG = {
-  clientId: '',
-  apiKey: '',
-  appId: '',
+  clientId: '538488751327-v30dbpt1ff24fbtia4ocdrfsn1h843gs.apps.googleusercontent.com',
+  apiKey: 'AIzaSyChN4D1ByozbJTGCfrWciSsJh4Oygg-uWk',
+  appId: '538488751327',
   allowedEmails: [],
+
+  // Accounts that get the Edit and Add buttons. Everyone else signs in to a
+  // read-only view. Leave empty to let every allowed account edit.
+  //
+  // THIS IS A UI SETTING, NOT A SECURITY CONTROL. Page code can be changed in
+  // the browser, and anyone signed in can call the Sheets API directly. To
+  // actually stop someone writing, share the sheet with them as **Viewer** in
+  // Google Sheets — then Google refuses their writes with a 403.
+  editors: [],
 
   // Sign out and clear data from the page after this much inactivity.
   idleMinutes: 20,

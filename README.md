@@ -30,6 +30,17 @@ Also:
 - **Escaped output.** Every value read from the sheet is escaped before it touches the page, so a cell can't inject code.
 - **Safe writes.** Before writing, the app re-reads the sheet, finds each target row by its content rather than its row number, and checks the value is still what you reviewed. If anything changed, nothing is written. All changes in one save go out as a single atomic `batchUpdate`.
 
+### Letting someone view but not edit
+
+Two settings, and only one of them actually enforces anything:
+
+1. **The real gate — share the sheet as Viewer.** In Google Sheets → Share, give them **Viewer**, not Editor. Google then refuses their writes with a `403`, whatever the app does. Add them as a **test user** too, or they can't sign in at all.
+2. **The UI — `editors` in `js/config.js`.** List the accounts that should see Edit and Add buttons. Everyone else gets a clean read-only dashboard with a *View only* badge. Leave the list empty and every account that can sign in may edit.
+
+`editors` is presentation, not protection: page code can be edited in the browser, and anyone signed in can call the Sheets API directly. Never rely on it alone — set the sharing level as well.
+
+Preview the read-only view locally with `http://localhost:8080/?demo&viewer`.
+
 **Why a public client ID is fine:** browser apps use no client secret. Google only accepts sign-ins that start from the *Authorized JavaScript origins* you register, so someone who copies your client ID onto their own site gets rejected.
 
 **The honest limit:** the app is as safe as your Google account and your unlocked devices. Use 2-step verification.
@@ -72,11 +83,16 @@ In **Google Auth Platform** (older consoles call it *OAuth consent screen*):
 **Google Auth Platform → Clients → Create client**
 
 - Application type: **Web application**
-- Authorized JavaScript origins:
-  - `https://USERNAME.github.io`
+- Name: anything, e.g. `Net Worth web app`. Only you see it, in the console; the sign-in screen shows the Branding app name.
+- Authorized JavaScript origins (click **+ Add URI** for each):
+  - `https://USERNAME.github.io`, where `USERNAME` is your GitHub username (from `github.com/USERNAME`) in lowercase
   - `http://localhost:8080` (for trying real sign-in locally)
-- Leave *redirect URIs* empty. Copy the **Client ID**.
-- If a **client secret** is shown, ignore it. This app never uses one, and it must not go in the repo (the pre-commit hook blocks it).
+
+  Enter the origin only: no path (not `/networth-tracker/`) and no trailing `/`.
+- Leave *Authorized redirect URIs* empty. Sign-in uses a popup, so there is no redirect.
+- Click **Create** and copy the **Client ID** (ends in `.apps.googleusercontent.com`).
+- If a **client secret** (`GOCSPX-…`) is shown, ignore it. This app never uses one, and it must not go in the repo (the pre-commit hook blocks it).
+- New origins can take from 5 minutes to a few hours to start working. An early `origin_mismatch` error is usually just that delay.
 
 **APIs & Services → Credentials → Create credentials → API key**, then *Edit API key*:
 

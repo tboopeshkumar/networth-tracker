@@ -20,6 +20,15 @@ if grep -qE 'docs\.google\.com/spreadsheets/d/[A-Za-z0-9_-]{20,}' <<<"$added"; t
   fail=1
 fi
 
+# Real email addresses belong in .env.local / GitHub variables, as hashes.
+# Placeholders like you@gmail.com and example.com addresses are fine.
+emails=$(grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' <<<"$added" \
+  | grep -viE '^(you|someone|name|user)@|@example\.|@users\.noreply\.github\.com$|@anthropic\.com$' || true)
+if [ -n "$emails" ]; then
+  echo "✖ staged changes contain email addresses — keep them in .env.local as hashes (npm run hash-email)"
+  fail=1
+fi
+
 # An OAuth client SECRET never belongs in a browser app (they don't use one).
 if grep -qE 'GOCSPX-[A-Za-z0-9_-]{10,}' <<<"$added"; then
   echo "✖ staged changes contain an OAuth client secret (GOCSPX-…). Browser apps don't need it — delete it and rotate it in Cloud Console."

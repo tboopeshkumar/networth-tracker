@@ -5,12 +5,20 @@
 // number. That way hand edits in the sheet - inserted rows, moved sections -
 // don't break the app, and a write always lands on the row the user meant.
 
-import { isNum } from './util.js';
+import { a1, isNum } from './util.js';
 
 export const TABS = [
   'Net Worth', 'Monthly Trend', 'Mutual Funds', 'Equity', 'Gold (India SGB)',
-  'Fixed Deposits', 'Bank Balances', 'Gold (UAE)', 'Silver (UAE)', 'NPS',
+  'Fixed Deposits', 'Bank Balances', 'Gold (UAE)', 'Silver (UAE)', 'NPS', 'Receivables',
 ];
+
+// Ledger tabs aren't named here: each family-loan row in Receivables names its
+// own ledger in the "Detail Sheet" column, and those tabs are read on demand.
+export const LEDGER = {
+  anchor: 'description', key: ['description', 'date', 'amount'], end: /net balance|^total/i,
+  headers: { description: 'Description', date: 'Date', amount: 'Amount' },
+  optionalHeaders: { note: 'Note', detail: 'Detail', interest: 'Interest Note' },
+};
 
 // headers: field -> header text. anchor: a field whose header is unique in its
 // row, used to disambiguate repeated headers (e.g. two "Account" columns).
@@ -74,6 +82,15 @@ export const SPECS = {
     tab: 'Silver (UAE)', anchor: 'qty', key: ['date', 'source', 'cost'], end: null,
     headers: { date: 'Date', source: 'Source', perUnit: 'Ounce', cost: 'Value', qty: 'Qty (oz)' },
   },
+  // optional: a sheet without these sections still loads
+  givenOut: {
+    tab: 'Receivables', anchor: 'status', key: ['person', 'date'], end: /total/i, optional: true,
+    headers: { person: 'Person', date: 'Date', amount: 'Amount', status: 'Status' },
+  },
+  familyLoans: {
+    tab: 'Receivables', anchor: 'detailSheet', key: ['account'], end: null, optional: true,
+    headers: { account: 'Account', reference: 'Reference', balance: 'Balance', detailSheet: 'Detail Sheet' },
+  },
 };
 
 const norm = (v) => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -94,17 +111,25 @@ export function locateTable(grid, spec) {
     const anchorCol = row.findIndex((v) => norm(v) === want[spec.anchor]);
     if (anchorCol < 0) continue;
 
-    const cols = {};
-    let ok = true;
-    for (const [field, h] of Object.entries(want)) {
+    const nearest = (h) => {
       let best = -1;
       row.forEach((v, c) => {
         if (norm(v) === h && (best < 0 || Math.abs(c - anchorCol) < Math.abs(best - anchorCol))) best = c;
       });
-      if (best < 0) { ok = false; break; }
-      cols[field] = best;
+      return best;
+    };
+    const cols = {};
+    let ok = true;
+    for (const [field, h] of Object.entries(want)) {
+      const c = nearest(h);
+      if (c < 0) { ok = false; break; }
+      cols[field] = c;
     }
     if (!ok) continue;
+    for (const [field, h] of Object.entries(spec.optionalHeaders || {})) {
+      const c = nearest(norm(h));
+      if (c >= 0) cols[field] = c;
+    }
 
     // Only the first matching header row counts: later repeats are
     // "closed / matured" record sections, which are not active holdings.
@@ -168,12 +193,64 @@ function summaryBlock(grid) {
 
 const isFormula = (v) => typeof v === 'string' && v.startsWith('=');
 
+// ='Some Tab'!$C$13  ->  { tab: 'Some Tab', row: 12, col: 2 }
+export function parseRef(formula) {
+  const m = /^=\s*(?:'((?:[^']|'')+)'|([A-Za-z0-9_.]+))!\$?([A-Z]{1,3})\$?(\d+)\s*$/.exec(String(formula ?? ''));
+  if (!m) return null;
+  const col = [...m[3]].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  return { tab: (m[1] ?? m[2]).replace(/''/g, "'"), row: Number(m[4]) - 1, col };
+}
+
+// Tabs named in the family-loan table's "Detail Sheet" column.
+export function detailSheets(values) {
+  const spec = SPECS.familyLoans;
+  const grid = values[spec.tab];
+  if (!grid) return [];
+  try {
+    return [...new Set(readRows(grid, locateTable(grid, spec)).map((r) => r.detailSheet).filter(Boolean))];
+  } catch {
+    return [];
+  }
+}
+
 export function buildModel(values, formulas) {
   const t = {};
   const rows = {};
   for (const [id, spec] of Object.entries(SPECS)) {
-    t[id] = locateTable(values[spec.tab], spec);
-    rows[id] = readRows(values[spec.tab], t[id]);
+    try {
+      t[id] = locateTable(values[spec.tab] || [], spec);
+      rows[id] = readRows(values[spec.tab], t[id]);
+    } catch (e) {
+      if (!spec.optional) throw e;
+      t[id] = null;
+      rows[id] = [];
+    }
+  }
+
+  // Where each Net Worth line gets its value, e.g. =Receivables!$C$13
+  for (const r of rows.networth) {
+    r._src = parseRef(cellAt(formulas['Net Worth'], r._row, t.networth.cols.current));
+  }
+
+  // Family-loan ledgers, from the tabs the Receivables table points at
+  const ledgers = {};
+  for (const f of rows.familyLoans) {
+    const grid = values[f.detailSheet];
+    if (!grid || ledgers[f.detailSheet]) continue;
+    try {
+      const spec = { ...LEDGER, tab: f.detailSheet };
+      const lt = locateTable(grid, spec);
+      ledgers[f.detailSheet] = {
+        sheet: f.detailSheet,
+        title: f.account,
+        rows: readRows(grid, lt),
+        balance: lt.totalRow === null ? null : cellAt(grid, lt.totalRow, lt.cols.amount),
+        balanceRef: lt.totalRow === null ? null : a1(f.detailSheet, lt.totalRow, lt.cols.amount),
+        familyKey: f._key,
+        recorded: f.balance,
+        recordedFormula: isFormula(cellAt(formulas[f.tab || SPECS.familyLoans.tab], f._row, t.familyLoans.cols.balance)),
+      };
+    } catch { /* not a ledger-shaped tab: skip it */ }
   }
 
   // Grand total row on Net Worth
@@ -233,7 +310,7 @@ export function buildModel(values, formulas) {
     c.formula = isFormula(cellAt(formulas[c.tab], c.row, c.col)) ? cellAt(formulas[c.tab], c.row, c.col) : null;
   }
 
-  return { tables: t, rows, totals, cells, summaries };
+  return { tables: t, rows, totals, cells, summaries, ledgers };
 }
 
 // Compare a table's total row against the sum of its rows. The sheet's totals

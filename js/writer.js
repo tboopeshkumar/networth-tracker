@@ -6,7 +6,7 @@
 // a ConflictError explains why. Otherwise all changes go out in ONE
 // spreadsheets.batchUpdate, which Google applies atomically.
 
-import { TABS, buildModel } from './model.js';
+import { TABS, buildModel, detailSheets } from './model.js';
 import { a1, colLetter, isNum } from './util.js';
 
 export class ConflictError extends Error {
@@ -56,6 +56,13 @@ function resolve(model, target) {
 
 export async function loadAll(adapter) {
   const [meta, data] = await Promise.all([adapter.meta(), adapter.read(TABS)]);
+  // Second pass: ledger tabs referenced from Receivables, if they exist
+  const extra = detailSheets(data.values).filter((t) => !TABS.includes(t) && meta.some((m) => m.title === t));
+  if (extra.length) {
+    const more = await adapter.read(extra);
+    Object.assign(data.values, more.values);
+    Object.assign(data.formulas, more.formulas);
+  }
   return { meta, data, model: buildModel(data.values, data.formulas) };
 }
 
