@@ -45,7 +45,7 @@ export function App() {
       <main className="wrap">
         {s.phase === 'setup' && <SetupScreen message={s.setupMessage} />}
         {s.phase === 'signin' && <SignInScreen ready={s.authReady} busy={s.busy} onSignIn={s.startSignIn} />}
-        {s.phase === 'pick' && <PickScreen onPick={() => void s.pick()} />}
+        {s.phase === 'pick' && <PickScreen onPick={() => void s.pick()} onLink={(link) => void s.openLink(link)} />}
         {(s.phase === 'loading' || s.phase === 'booting') && <LoadingScreen />}
         {session && <Dashboard loaded={session.loaded} canEdit={canEdit} onEdit={onEdit} />}
       </main>

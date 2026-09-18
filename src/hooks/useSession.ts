@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CONFIG, isConfigured } from '../config';
 import { accessFor } from '../lib/access';
 import { disconnect, getToken, initAuth, signIn, signOut } from '../lib/auth';
-import { pickSpreadsheet, rememberSheet, rememberedSheet } from '../lib/picker';
+import { parseSheetId, pickSpreadsheet, rememberSheet, rememberedSheet } from '../lib/picker';
 import { AccessError, AuthError, GoogleSheets, type SheetsBackend } from '../lib/sheets';
 import { execute, loadAll, type Loaded, type Plan } from '../lib/writer';
 
@@ -42,7 +42,7 @@ export function useSession(toast: Toast) {
     toast(e instanceof Error ? e.message : String(e), 'err');
   }, [lock, toast]);
 
-  const open = useCallback(async (backend: SheetsBackend, email: string) => {
+  const open = useCallback(async (backend: SheetsBackend, email: string, deniedMessage?: string) => {
     setPhase('loading');
     try {
       const loaded = await loadAll(backend);
@@ -52,7 +52,7 @@ export function useSession(toast: Toast) {
       if (e instanceof AccessError) {
         rememberSheet(email, null);
         setPhase('pick');
-        toast(e.message, 'err');
+        toast(deniedMessage ?? e.message, 'err');
         return;
       }
       setPhase(getToken() ? 'pick' : 'signin');
@@ -121,6 +121,17 @@ export function useSession(toast: Toast) {
     }
   }, [identity, lock, open, fail]);
 
+  // For devices where the Picker can't run (Safari blocks its cookies). The
+  // drive.file grant from picking the sheet once, on any device, still applies.
+  const openLink = useCallback(async (input: string) => {
+    if (!getToken() || !identity) { lock(EXPIRED); return; }
+    const id = parseSheetId(input);
+    if (!id) { toast('That doesn’t look like a Google Sheets link.', 'err'); return; }
+    rememberSheet(identity.email, { id, name: '' });
+    await open(new GoogleSheets(id, getToken), identity.email,
+      'This account hasn’t opened that sheet in the app yet. Pick it once with “Choose from Google Drive” on a computer, then paste the link here.');
+  }, [identity, lock, open, toast]);
+
   const refresh = useCallback(async () => {
     if (!session) return;
     if (!DEMO && !getToken()) { lock(EXPIRED); return; }
@@ -160,6 +171,6 @@ export function useSession(toast: Toast) {
 
   return {
     phase, setupMessage, identity, session, authReady, busy,
-    startSignIn, pick, refresh, write, switchSheet, revoke, lock, tokenValid,
+    startSignIn, pick, openLink, refresh, write, switchSheet, revoke, lock, tokenValid,
   };
 }

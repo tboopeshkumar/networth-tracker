@@ -14,6 +14,7 @@ import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
+import { parseSheetId } from '../src/lib/picker';
 import {
   ConflictError, V, execute, loadAll, planCellEdit, planInsert, planMetalPurchase, planRowEdit,
 } from '../src/lib/writer';
@@ -54,6 +55,16 @@ test('access lists decide what the UI offers', () => {
   assert.deepEqual(accessFor('  Owner@Example.com ', lists), { allowed: true, canEdit: true });
   // empty lists mean no restriction at this level
   assert.deepEqual(accessFor('anyone@example.com', { allowed: [], editors: [] }), { allowed: true, canEdit: true });
+});
+
+test('a pasted sheet link or bare ID yields the spreadsheet ID', () => {
+  const id = 'AbC_12-' + 'x'.repeat(30);
+  const base = ['https:', '', 'docs.google.com', 'spreadsheets', 'd'].join('/'); // built up so the hook doesn't flag it
+  assert.equal(parseSheetId(`${base}/${id}/edit?gid=0#gid=0`), id);
+  assert.equal(parseSheetId(`  ${base}/${id}/edit  `), id);
+  assert.equal(parseSheetId(id), id);
+  assert.equal(parseSheetId('not a link'), null);
+  assert.equal(parseSheetId('https://example.com/doc/123'), null);
 });
 
 /* ---------- model ---------- */

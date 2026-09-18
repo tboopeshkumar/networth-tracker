@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'vitest';
 
+import { PickScreen } from '../src/components/Screens';
 import { Positions } from '../src/components/dashboard/Positions';
 import { Summary } from '../src/components/dashboard/Summary';
 import { DemoSheets, type Fixture } from '../src/lib/demoSheets';
@@ -12,6 +13,13 @@ import { makeLinker } from '../src/lib/links';
 import { loadAll } from '../src/lib/writer';
 
 const FIX = new URL('../demo/fixture.json', import.meta.url);
+
+test('the sheet chooser offers a paste-a-link path for iPhone', () => {
+  const html = renderToStaticMarkup(<PickScreen onPick={() => {}} onLink={() => {}} />);
+  assert.ok(html.includes('Choose from Google Drive'));
+  assert.ok(html.includes('On iPhone or iPad?'));
+  assert.ok(/<input[^>]*type="url"/.test(html), 'a link field');
+});
 
 test('sheet text is escaped, never interpreted as markup', async () => {
   if (!existsSync(FIX)) return;
