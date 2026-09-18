@@ -1,18 +1,24 @@
-import { cr, fmtDate, fmtMonth, inr, isNum, n0, pct, ret, signedCr, signedPct, tone } from '../../lib/format';
+import { cr, fmtDate, fmtMonth, isNum, n0, pct, ret, signedCr, signedPct, tone } from '../../lib/format';
 import type { Model } from '../../lib/model';
-import { Sparkline } from '../charts/Sparkline';
-import { slotColor } from '../ui';
 
-/** One composition figure: amount, share of total, and a bar for the share. */
-function ShareTile({ label, value, share, slot }: { label: string; value: number; share: number; slot: number }) {
+/** One composition figure: amount and its share of the total. */
+function ShareTile({ label, value, share }: { label: string; value: number; share: number }) {
   return (
     <div className="card share-tile">
       <div className="label">{label}</div>
       <div className="share-val">{cr(value)}</div>
-      <div className="share-row">
-        <span className="share-pct">{pct(share)}</span>
-        <span className="share-track"><span className="share-fill" style={{ width: `${Math.min(100, share * 100)}%`, background: slotColor(slot) }} /></span>
-      </div>
+      <div className="share-pct">{pct(share)}<span className="share-of"> of total</span></div>
+    </div>
+  );
+}
+
+/** A labelled figure with one line of context, coloured by gain or loss. */
+function Stat({ label, value, note, t }: { label: string; value: string; note: string; t: string }) {
+  return (
+    <div className={`stat stat-${t || 'flat'}`}>
+      <div className="label">{label}</div>
+      <div className={`stat-val ${t}`}>{value}</div>
+      <div className="stat-note">{note}</div>
     </div>
   );
 }
@@ -20,7 +26,6 @@ function ShareTile({ label, value, share, slot }: { label: string; value: number
 export function Summary({ model }: { model: Model }) {
   const T = model.totals;
   const nw = model.rows.networth;
-  const trend = model.rows.trend.filter((d) => isNum(d.networth));
   const r = ret(T.pnl, T.invested);
 
   const sumWhere = (p: (x: (typeof nw)[number]) => boolean) => nw.filter(p).reduce((a, x) => a + n0(x.current), 0);
@@ -29,9 +34,11 @@ export function Summary({ model }: { model: Model }) {
   const uae = sumWhere((x) => x.location === 'UAE');
   const share = (v: number) => (T.current ? v / T.current : 0);
 
-  const latest = model.rows.trend.filter((d) => isNum(d.savings)).at(-1);
-  const first = trend[0];
-  const growth = first && n0(first.networth) ? n0(trend[trend.length - 1]?.networth) / n0(first.networth) : null;
+  // Latest recorded month, and the one before it for "vs …"
+  const months = model.rows.trend.filter((d) => isNum(d.savings));
+  const latest = months.at(-1);
+  const prior = model.rows.trend[model.rows.trend.findIndex((d) => d === latest) - 1];
+  const arrow = (n: unknown) => (n0(n) >= 0 ? '▲' : '▼');
 
   // Newest valuation date across the priced holdings
   const dates = [...model.rows.mf.map((x) => x.navDate), ...model.rows.equity.map((x) => x.navDate), ...model.rows.sgb.map((x) => x.valueDate)].filter(isNum);
@@ -47,34 +54,31 @@ export function Summary({ model }: { model: Model }) {
           {newest !== null && <span className="hero-asof">valued {fmtDate(newest)}</span>}
         </div>
 
-        <div className="hero-figure">
-          <span className="hero-value">{cr(T.invested)}</span>
-          <span className="hero-secondary">
-            <span className="muted">now worth</span>
-            <b>{cr(T.current)}</b>
-            <span className={`hero-chip ${tone(T.pnl)}`}>{signedPct(r)}</span>
-          </span>
-        </div>
+        <div className="hero-value">{cr(T.invested)}</div>
+        <div className="hero-now"><span className="muted">now worth</span> <b>{cr(T.current)}</b></div>
 
-        <Sparkline values={trend.map((d) => n0(d.networth))} />
-        <div className="spark-cap">Recorded month-end net worth · {trend.length} months</div>
-
-        <div className="hero-facts">
-          <span className={tone(T.pnl)}><span className="muted">Unrealised</span> {signedCr(T.pnl)}</span>
+        <div className="stats">
+          <Stat
+            label="Unrealised gain"
+            value={signedCr(T.pnl)}
+            note={`${signedPct(r)} on invested`}
+            t={tone(T.pnl)}
+          />
           {latest && (
-            <span className={tone(latest.savings)}>
-              <span className="muted">{fmtMonth(latest.month)}</span> {n0(latest.savings) >= 0 ? '▲' : '▼'} {signedCr(latest.savings)}
-            </span>
+            <Stat
+              label={fmtMonth(latest.month)}
+              value={`${arrow(latest.savings)} ${signedCr(latest.savings)}`}
+              note={prior ? `change vs ${fmtMonth(prior.month)}` : 'change on the month'}
+              t={tone(latest.savings)}
+            />
           )}
-          {growth && first && <span><span className="muted">Since {fmtMonth(first.month)}</span> {growth.toFixed(2)}×</span>}
-          <span className="hero-exact muted">{inr(T.invested)} invested</span>
         </div>
       </section>
 
       <div className="grid shares">
-        <ShareTile label="Liquid cash" value={liquid} share={share(liquid)} slot={1} />
-        <ShareTile label="Equity exposure" value={equity} share={share(equity)} slot={2} />
-        <ShareTile label="Held in UAE" value={uae} share={share(uae)} slot={4} />
+        <ShareTile label="Liquid cash" value={liquid} share={share(liquid)} />
+        <ShareTile label="Equity exposure" value={equity} share={share(equity)} />
+        <ShareTile label="Held in UAE" value={uae} share={share(uae)} />
       </div>
     </>
   );
