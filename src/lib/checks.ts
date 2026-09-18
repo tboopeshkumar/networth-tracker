@@ -1,6 +1,6 @@
 // "Worth a look": things in the sheet that are probably wrong or stale.
 
-import { cr, fmtDate, fmtMonth, inr, isNum, todaySerial } from './format';
+import { fmtDate, inr, isNum, todaySerial } from './format';
 import { totalDrift, type Grids, type Model } from './model';
 
 export interface Check { id: string; title: string; detail: string }
@@ -8,7 +8,6 @@ export interface Check { id: string; title: string; detail: string }
 export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[] {
   const out: Check[] = [];
   const R = model.rows;
-  const T = model.totals;
 
   for (const [id, field, name] of [['mf', 'current', 'Mutual Funds'], ['equity', 'currentInr', 'Equity'], ['sgb', 'market', 'Gold (SGB)'], ['fd', 'amount', 'Fixed Deposits']] as const) {
     const d = totalDrift(model, values, id, field);
@@ -51,15 +50,6 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
       id: 'matured',
       title: `${matured.length} fixed deposit${matured.length > 1 ? 's' : ''} past maturity but still counted.`,
       detail: matured.map((r) => `${r.institution} (${fmtDate(r.maturityDate)})`).join(', '),
-    });
-  }
-
-  const last = R.trend.filter((d) => isNum(d.networth)).at(-1);
-  if (last && isNum(last.networth) && Math.abs(T.current - last.networth) > 1e5) {
-    out.push({
-      id: 'trend-gap',
-      title: `The last trend entry is ${cr(T.current - last.networth)} away from today’s total.`,
-      detail: `${fmtMonth(last.month)} recorded ${cr(last.networth)}; the Net Worth tab now totals ${cr(T.current)}. That's normal if markets moved — or add a snapshot.`,
     });
   }
 
