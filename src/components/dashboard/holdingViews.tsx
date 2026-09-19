@@ -198,9 +198,10 @@ export function buildViews(model: Model): View[] {
   }
 
   // The jewellery register: one section per list in the sheet, for reference.
-  // Nothing here feeds a total anywhere in the app.
+  // Nothing here feeds a total anywhere in the app. Record-only lists
+  // (exchanged or sold pieces) stay in the sheet and aren't shown.
   model.jewellery?.sections.forEach((s, i) => {
-    if (!s.rows.length) return;
+    if (!s.rows.length || !s.held) return;
     const paid = (r: Row) => {
       if (!isNum(r.total)) return '—';
       return !r.currency || /inr/i.test(String(r.currency)) ? inr(r.total) : `${String(r.currency)} ${num(r.total, 0)}`;
