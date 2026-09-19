@@ -26,20 +26,6 @@ export function GoldValuation({ v }: { v: Valuation }) {
         {isNum(v.rate) && <span className="muted"> · at {inr(v.rate)}/g</span>}
       </div>
 
-      {v.parts.length > 1 && (
-        <div className="gold-parts">
-          {v.parts.map((p) => (
-            <div className="gold-part" key={p.title}>
-              <span className="gold-part-name">{p.title}</span>
-              <span className="gold-part-g">{num(p.grams)} g</span>
-              <span className="gold-part-share">
-                <span style={{ width: `${(p.grams / (v.grams as number)) * 100}%` }} />
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {caveats && <div className="gold-foot">{caveats}</div>}
     </div>
   );

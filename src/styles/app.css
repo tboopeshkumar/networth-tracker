@@ -312,12 +312,6 @@ tr.linked:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px
 .gold-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 4px; }
 .gold-facts { font-size: 13px; margin-top: 2px; }
 .gold-facts b { font-weight: 600; }
-.gold-parts { display: grid; gap: 7px; margin-top: 12px; }
-.gold-part { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; font-size: 13px; }
-.gold-part-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gold-part-g { font-variant-numeric: tabular-nums; font-weight: 500; }
-.gold-part-share { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--grid); overflow: hidden; }
-.gold-part-share span { display: block; height: 100%; background: var(--s4); border-radius: 2px; }
 .gold-foot { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 .hsec { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; background: var(--surface); }
 .hsec > summary {
