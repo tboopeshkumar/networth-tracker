@@ -29,6 +29,10 @@ function onOpen() {
     .addItem('Refresh NAVs now', 'refreshNav')
     .addItem('Set up NAV Feed tab', 'setupNavFeed')
     .addItem('Refresh NAVs daily (7am IST)', 'installDailyTrigger')
+    .addSeparator()
+    // From RatesFeed.gs, if it's in this project
+    .addItem('Refresh gold & AED rates now', 'refreshRates')
+    .addItem('Refresh rates daily (11am IST)', 'installRatesTrigger')
     .addToUi();
 }
 

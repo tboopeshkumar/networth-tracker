@@ -1,6 +1,7 @@
 import type { CellPath } from '../../lib/editors';
 import { fmtDate, inr, num } from '../../lib/format';
 import type { Model } from '../../lib/model';
+import { feedRateFor } from '../../lib/ratesFeed';
 import { Card, EditButton, type OnEdit } from '../ui';
 
 interface Tile { label: string; value: string; note: string; path: CellPath }
@@ -10,7 +11,11 @@ export function RatesInputs({ model, canEdit, onEdit }: { model: Model; canEdit:
   const C = model.cells;
   const S = model.summaries;
   const tiles: Tile[] = [];
-  if (C.fxAedInr) tiles.push({ label: 'AED → INR', value: num(C.fxAedInr.value, 4), note: C.fxAedInr.formula ? 'Live rate' : 'Typed in', path: 'cells.fxAedInr' });
+  const fxNote = (formula: string | null | undefined, live: string) => {
+    const daily = feedRateFor(model.ratesFeed, formula);
+    return daily ? `Daily · ${fmtDate(daily.rateDate)}` : formula ? live : 'Typed in';
+  };
+  if (C.fxAedInr) tiles.push({ label: 'AED → INR', value: num(C.fxAedInr.value, 4), note: fxNote(C.fxAedInr.formula, 'Live rate'), path: 'cells.fxAedInr' });
   if (C.fxUsdAed) tiles.push({ label: 'USD → AED', value: num(C.fxUsdAed.value, 4), note: C.fxUsdAed.formula ? 'Formula' : 'Typed in', path: 'cells.fxUsdAed' });
   if (C.npsInvested) tiles.push({ label: 'NPS contributions', value: inr(C.npsInvested.value), note: `As of ${fmtDate(C.npsAsOf?.value)}`, path: 'cells.npsInvested' });
   if (C.npsGain) tiles.push({ label: 'NPS gain', value: inr(C.npsGain.value), note: 'Unrealised', path: 'cells.npsGain' });

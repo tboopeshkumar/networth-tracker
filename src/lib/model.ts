@@ -7,6 +7,7 @@
 
 import { a1, colIndex, isNum, n0, type Cell } from './format';
 import { JEWELLERY_TAB, readJewellery, type Jewellery } from './jewellery';
+import { RATES_TAB, readRatesFeed, type FeedRate } from './ratesFeed';
 
 export type Grid = Cell[][];
 export type Grids = Record<string, Grid>;
@@ -106,7 +107,7 @@ export const SPECS = {
 };
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -185,6 +186,8 @@ export interface Model {
   ledgers: Record<string, Ledger>;
   /** Reference only: never part of any total. */
   jewellery: Jewellery | null;
+  /** Daily rates written by the Rates Feed script, if the sheet has that tab. */
+  ratesFeed: FeedRate[];
 }
 
 /* ---------- parsing ---------- */
@@ -399,7 +402,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]) };
 }
 
 /**

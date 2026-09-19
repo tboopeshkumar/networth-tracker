@@ -38,6 +38,8 @@ export interface GoldValuation {
   rateAsOf: string | null;
   /** the rate cell fetches its value (IMPORTXML, GOOGLEFINANCE, ...) */
   rateLive: boolean;
+  /** the rate cell's formula, if it has one */
+  rateFormula: string | null;
   /**
    * The held lists the valuation covers: those placed above the valuation
    * block. Empty unless their grams add up to the sheet's own total.
@@ -135,7 +137,9 @@ export function readJewellery(grid: Grid | undefined, formulas?: Grid): Jeweller
   const rateHit = find(/gold rate/i);
   const rateCol = rateHit ? rateHit.row.findIndex((v, j) => j > rateHit.c && isNum(v)) : -1;
   const rate = rateHit && rateCol >= 0 ? (rateHit.row[rateCol] as number) : null;
-  const rateLive = !!rateHit && rateCol >= 0 && FETCHES.test(String(formulas?.[rateHit.i]?.[rateCol] ?? ''));
+  const f = rateHit && rateCol >= 0 ? formulas?.[rateHit.i]?.[rateCol] : null;
+  const rateFormula = typeof f === 'string' && f.startsWith('=') ? f : null;
+  const rateLive = FETCHES.test(rateFormula ?? '');
   const note = noteHit ? String(noteHit.row[noteHit.c]).trim() : null;
 
   // The lists the valuation covers sit above its block; trust the split only
@@ -154,6 +158,7 @@ export function readJewellery(grid: Grid | undefined, formulas?: Grid): Jeweller
       note,
       rateAsOf: note?.match(/rate as of\s*([0-9]{1,2}[-\s][A-Za-z]{3,9}[-\s][0-9]{4})/i)?.[1] ?? null,
       rateLive,
+      rateFormula,
       parts,
     },
   };

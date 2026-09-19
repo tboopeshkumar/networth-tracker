@@ -74,5 +74,15 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
     }
   }
 
+  // The daily Rates Feed script stopped (trigger removed, source page changed...)
+  const lastFeed = Math.max(...model.ratesFeed.map((f) => f.refreshed).filter(isNum));
+  if (Number.isFinite(lastFeed) && todaySerial() - lastFeed > 3) {
+    out.push({
+      id: 'rates-feed',
+      title: `Gold and AED rates haven’t refreshed since ${fmtDate(lastFeed)}.`,
+      detail: 'In the sheet, use Net Worth → Refresh gold & AED rates now to see the error, then Refresh rates daily to reinstall the schedule.',
+    });
+  }
+
   return out;
 }

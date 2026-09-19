@@ -41,7 +41,7 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
           <div className="hgroup" key={label}>
             <div className="hgroup-label">{label}</div>
             {groupNote(model, label) && <div className="hgroup-note">{groupNote(model, label)}</div>}
-            {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} />}
+            {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
             {vs.map((v) => (
               <details
                 key={v.id}

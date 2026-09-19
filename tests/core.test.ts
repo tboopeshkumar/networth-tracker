@@ -14,6 +14,7 @@ import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
 import { JEWELLERY_TAB, readJewellery } from '../src/lib/jewellery';
+import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { parseSheetId } from '../src/lib/picker';
 import {
@@ -213,6 +214,21 @@ test('a gold rate fetched by a formula is marked live; a typed one is not', () =
   assert.equal(readJewellery(grid)!.valuation.rateLive, false, 'no formulas read');
   formulas[5][2] = '=C4*1.1';
   assert.equal(readJewellery(grid, formulas)!.valuation.rateLive, false, 'a formula that fetches nothing');
+});
+
+test('a rate read from the Rates Feed tab is traced back to its row', () => {
+  const feed = readRatesFeed([
+    ['Rate', 'Value', 'Source', 'Rate date', 'Refreshed'],
+    ['Gold 22C (₹/g)', 1000, 'Example', 46000, 46000.5],
+    ['AED → INR', 20, 'Example', 46001, 46001.5],
+  ]);
+  assert.equal(feed.length, 2);
+  assert.equal(feedRateFor(feed, `=VLOOKUP("Gold 22C (₹/g)", 'Rates Feed'!A:B, 2, FALSE)`)?.rateDate, 46000);
+  assert.equal(feedRateFor(feed, `='Rates Feed'!B3`)?.label, 'AED → INR', 'direct reference, by sheet row');
+  assert.equal(feedRateFor(feed, `='Rates Feed'!$B$2*1`)?.label, 'Gold 22C (₹/g)');
+  assert.equal(feedRateFor(feed, '=GOOGLEFINANCE("CURRENCY:USDINR")/3.6725'), null, 'not from the feed');
+  assert.equal(feedRateFor(feed, null), null);
+  assert.deepEqual(readRatesFeed(undefined), []);
 });
 
 /* ---------- writes ---------- */

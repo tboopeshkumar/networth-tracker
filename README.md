@@ -233,6 +233,7 @@ src/
   styles/app.css             colour-blind-safe palette, light and dark
 tests/                       Vitest; most tests need the local fixture
 apps-script/NavFeed.gs       daily AMFI NAVs, runs inside the sheet
+apps-script/RatesFeed.gs     daily 22C gold and AED → INR rates
 tools/                       fixture builder, git hooks
 .github/workflows/deploy.yml build, test, check and publish
 ```
@@ -246,6 +247,22 @@ These run in Google Sheets itself, not in the app.
 ### Live AED → INR rate
 
 In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from Google Finance*. It writes `=GOOGLEFINANCE("CURRENCY:USDINR")/3.6725`. AED is pegged to USD at 3.6725, so this tracks the market with no upkeep. Quotes can be up to 20 minutes old.
+
+### Daily gold and AED rates
+
+`IMPORTXML` and `GOOGLEFINANCE` formulas only refresh reliably while the sheet is open, and the web app reads the last saved values. `apps-script/RatesFeed.gs` fetches the rates on a schedule instead, into a `Rates Feed` tab:
+
+| Rate | Source |
+|---|---|
+| Gold 22C (₹/g) | Gulf News, India gold prices (the day's 22 Carat rate) |
+| AED → INR | Google Finance USD → INR ÷ 3.6725 (the AED peg) |
+
+1. In **Extensions → Apps Script**, add a script file, paste `RatesFeed.gs` in, and also paste the updated `NavFeed.gs` (it adds the menu items). Save and reload the sheet.
+2. **Net Worth** menu → **Refresh gold & AED rates now**. The first run asks you to approve fetching from the web.
+3. **Net Worth** → **Refresh rates daily (11am IST)**.
+4. Point the cells at the feed: the gold rate cell `=VLOOKUP("Gold 22C (₹/g)",'Rates Feed'!A:B,2,FALSE)` and the AED → INR cell `=VLOOKUP("AED → INR",'Rates Feed'!A:B,2,FALSE)`.
+
+The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
 ### Daily mutual fund NAVs
 
