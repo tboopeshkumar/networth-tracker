@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { Logo } from './Logo';
 
 interface Props {
   sheetTitle?: string;
@@ -23,7 +24,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
   return (
     <header className="bar">
       <div className="bar-title">
-        <span className="logo" aria-hidden="true">📈</span>
+        <Logo />
         <div>
           <div className="app-name">Net Worth</div>
           <div className="bar-sub">
