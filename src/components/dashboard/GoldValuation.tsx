@@ -19,12 +19,16 @@ export function GoldValuation({ v }: { v: Valuation }) {
         {v.rateAsOf && <span className="gold-asof">rate as of {v.rateAsOf}</span>}
       </div>
 
-      {isNum(v.value) && <div className="gold-value">≈ {cr(v.value)}</div>}
-      <div className="gold-facts">
-        <b>{num(v.grams)} g</b>
-        <span className="muted"> · {num(v.grams / SOVEREIGN_G, 1)} sovereigns</span>
-        {isNum(v.rate) && <span className="muted"> · at {inr(v.rate)}/g</span>}
+      {/* What you hold leads; its value moves with the gold rate, so it follows */}
+      <div className="gold-qty">
+        <span className="gold-grams">{num(v.grams)} g</span>
+        <span className="gold-sov">{num(v.grams / SOVEREIGN_G, 1)} sovereigns</span>
       </div>
+      {isNum(v.value) && (
+        <div className="gold-worth">
+          worth ≈ <b>{cr(v.value)}</b>{isNum(v.rate) && <> at {inr(v.rate)}/g</>}
+        </div>
+      )}
 
       {caveats && <div className="gold-foot">{caveats}</div>}
     </div>
