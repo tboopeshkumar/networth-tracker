@@ -114,10 +114,9 @@ function parseDayMonth_(s) {
   return mon < 0 ? null : [Number(m[3]), mon + 1, Number(m[1])];
 }
 
-/** Midnight of that day in the spreadsheet's time zone, not the script's. */
+/** The day itself as a DATE formula; a JS Date would shift with the script's time zone. */
 function rateDay_([y, m, d]) {
-  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
-  return Utilities.parseDate(y + '-' + m + '-' + d, tz, 'yyyy-M-d');
+  return '=DATE(' + y + ',' + m + ',' + d + ')';
 }
 
 /* ---------- AED → INR ---------- */

@@ -99,13 +99,12 @@ function parseAmfi_(text) {
 }
 
 /**
- * Midnight of a calendar day in the spreadsheet's own time zone. A plain
- * new Date(y, m, d) is midnight in the script's zone, which can land on the
- * previous evening in the sheet (18 Sep showing as 17 Sep 20:00).
+ * A calendar day as a DATE formula. A JS Date is an instant, and the script's
+ * time zone can differ from the sheet's, so new Date(y, m, d) landed on the
+ * previous evening (18 Sep read as 17 Sep 20:00). DATE() is the day itself.
  */
 function navDay_([y, m, d]) {
-  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
-  return Utilities.parseDate(y + '-' + m + '-' + d, tz, 'yyyy-M-d');
+  return '=DATE(' + y + ',' + m + ',' + d + ')';
 }
 
 /* ---------- the Mutual Funds tab ---------- */
