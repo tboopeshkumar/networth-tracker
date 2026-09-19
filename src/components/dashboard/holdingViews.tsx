@@ -53,9 +53,6 @@ const view = <R extends Row>(v: View<R>) => v as unknown as View;
 
 export function buildViews(model: Model): View[] {
   const R = model.rows;
-  // Units, when the sheet keeps them on the Mutual Funds tab
-  const hasUnits = model.tables.mf.cols.units !== undefined;
-  const units = (r: Row) => (isNum(r.units) ? num(r.units, 3) : '—');
   const views: View[] = [
     view<RowOf<'mf'>>({
       id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: cr(sum(R.mf, 'current')),
@@ -64,7 +61,6 @@ export function buildViews(model: Model): View[] {
         { head: 'Fund', name: true, render: (r) => <>{text(r.fund)}<div className="sub2">{text(r.platform)}</div></> },
         { head: 'Holder', render: (r) => text(r.holder) },
         { head: 'Type', render: (r) => text(r.category) },
-        ...(hasUnits ? [{ head: 'Units', num: true, render: (r: RowOf<'mf'>) => units(r) }] : []),
         { head: 'Invested', num: true, render: (r) => inr(r.invested) },
         { head: 'Current', num: true, render: (r) => inr(r.current), className: () => 'strong' },
         { head: 'P&L', num: true, render: (r) => signedInr(r.pnl), className: (r) => tone(r.pnl) },
@@ -73,7 +69,7 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({
         title: text(r.fund), value: inr(r.current), sub: join(r.holder, r.category, r.platform),
-        right: gain(r.pnl, r.invested), foot: join(hasUnits ? `${units(r)} units` : '', `Invested ${cr(r.invested)}`, `NAV ${fmtDate(r.navDate)}`),
+        right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDate(r.navDate)}`,
       }),
     }),
     view<RowOf<'equity'>>({
