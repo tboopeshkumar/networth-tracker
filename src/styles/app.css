@@ -304,7 +304,7 @@ tr.linked:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px
 /* the sheet's 22C gold valuation, at the top of the jewellery group */
 .gold-card {
   padding: 13px 14px 12px; margin-bottom: 8px; border-radius: 10px;
-  background: var(--page); border: 1px solid var(--border); border-left: 3px solid var(--s4);
+  background: var(--page); border: 1px solid var(--border); border-left: 3px solid var(--good);
 }
 .gold-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .gold-head .label { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
