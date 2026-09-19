@@ -271,7 +271,6 @@ The app then shows each rate's date, and *Worth a look* flags the feed if it has
 What you hold lives on the **Mutual Funds** tab, in two columns after NAV Date: **AMFI code** (from [NAVAll.txt](https://www.amfiindia.com/spages/NAVAll.txt)) and **Units** (from your CAS statement). Each fund's *Current* is `units × VLOOKUP(code, 'NAV Feed'!A:C, 2)` and its *NAV Date* is `VLOOKUP(code, 'NAV Feed'!A:C, 3)`. The script prices every code it finds there, so a new fund needs only its code and units.
 
 1. In the sheet: **Extensions → Apps Script**, paste the file in and save, then reload the sheet.
-2. Coming from the older layout (units on the NAV Feed tab)? Use **Net Worth → Move units to Mutual Funds (one-time)**. It adds the two columns, copies each fund's code and units across, rewrites Current and NAV Date to look up by code, and rebuilds NAV Feed. It checks every fund first and changes nothing if one can't be matched.
-3. **Net Worth → Refresh NAVs now**, then **Refresh NAVs daily (7am IST)**.
+2. **Net Worth → Refresh NAVs now**, then **Refresh NAVs daily (7am IST)**.
 
 In the app, editing a fund then asks for units, invested amount and scheme code; its value follows from the NAV. Check each code's plan (Direct/Regular) and option (Growth/IDCW); NAV Feed's scheme-name column shows AMFI's full name so you can confirm.

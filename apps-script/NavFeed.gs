@@ -32,7 +32,6 @@ function onOpen() {
     .createMenu('Net Worth')
     .addItem('Refresh NAVs now', 'refreshNav')
     .addItem('Refresh NAVs daily (7am IST)', 'installDailyTrigger')
-    .addItem('Move units to Mutual Funds (one-time)', 'moveUnitsToFunds')
     .addSeparator()
     // From RatesFeed.gs, if it's in this project
     .addItem('Refresh gold & AED rates now', 'refreshRates')
@@ -146,19 +145,11 @@ function fundCodes_() {
   return codes;
 }
 
-/** The older layout kept Fund and Units on the NAV Feed tab. */
-function isOldFeed_(sh) {
-  return norm_(sh.getRange(1, 2).getValue()) === 'fund';
-}
-
 /* ---------- refresh ---------- */
 
 function refreshNav() {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(FEED_TAB) || setupNavFeed();
-  if (isOldFeed_(sh)) {
-    throw new Error('NAV Feed still holds units. Use Net Worth → Move units to Mutual Funds (one-time) first.');
-  }
   const codes = fundCodes_();
   if (!codes.length) {
     throw new Error('No AMFI codes found. Add an "AMFI code" column to the ' + FUNDS_TAB + ' tab.');
@@ -187,58 +178,4 @@ function installDailyTrigger() {
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('refreshNav').timeBased().everyDays(1).atHour(7).inTimezone('Asia/Kolkata').create();
   SpreadsheetApp.getActive().toast('NAVs will refresh every morning around 7am IST.', 'Net Worth', 6);
-}
-
-/* ---------- one-time move from the older layout ---------- */
-
-/**
- * Moves each fund's AMFI code and units from the NAV Feed tab onto the
- * Mutual Funds tab (two new columns after the last one), points Current and
- * NAV Date at the code, then turns NAV Feed into the plain price list.
- * Checks everything first and changes nothing if a fund can't be matched.
- */
-function moveUnitsToFunds() {
-  const ss = SpreadsheetApp.getActive();
-  const feed = ss.getSheetByName(FEED_TAB);
-  const funds = ss.getSheetByName(FUNDS_TAB);
-  if (!feed || !funds) throw new Error('Needs both the ' + FEED_TAB + ' and ' + FUNDS_TAB + ' tabs.');
-  if (!isOldFeed_(feed)) { ss.toast('Already done: NAV Feed is the plain price list.', 'Net Worth', 6); return; }
-
-  // Old NAV Feed: A code, B fund, C units
-  const byFund = {};
-  feed.getDataRange().getValues().slice(1).forEach((r) => {
-    if (norm_(r[1])) byFund[norm_(r[1])] = { code: r[0], units: r[2] };
-  });
-
-  const t = fundsTable_(funds);
-  if (t.cols['amfi code'] || t.cols.units) throw new Error(FUNDS_TAB + ' already has AMFI code / Units columns.');
-  if (!t.cols['nav date']) throw new Error('No NAV Date column on ' + FUNDS_TAB + '.');
-
-  // Only funds priced from the feed move; anything valued by hand stays as it is
-  const fed = t.rows.filter((r) => /nav feed/i.test(funds.getRange(r, t.cols.current).getFormula()));
-  const missing = fed.filter((r) => !byFund[norm_(t.vals[r - 1][t.cols.fund - 1])]);
-  if (missing.length) {
-    throw new Error('Not on NAV Feed, so nothing was changed: ' + missing.map((r) => t.vals[r - 1][t.cols.fund - 1]).join(', '));
-  }
-
-  const codeCol = t.lastCol + 1;
-  const unitsCol = t.lastCol + 2;
-  const L = (c) => funds.getRange(1, c).getA1Notation().replace(/\d+$/, '');
-  funds.getRange(t.headerRow, t.lastCol).copyTo(funds.getRange(t.headerRow, codeCol, 1, 2), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-  funds.getRange(t.headerRow, codeCol, 1, 2).setValues([['AMFI code', 'Units']]);
-
-  for (const r of fed) {
-    const hit = byFund[norm_(t.vals[r - 1][t.cols.fund - 1])];
-    const code = L(codeCol) + r;
-    funds.getRange(r, codeCol, 1, 2).setValues([[hit.code, hit.units]]);
-    funds.getRange(r, t.cols.current).setFormula('=IFERROR(' + L(unitsCol) + r + "*VLOOKUP(" + code + ",'" + FEED_TAB + "'!$A:$C,2,FALSE),\"\")");
-    funds.getRange(r, t.cols['nav date']).setFormula('=IFERROR(VLOOKUP(' + code + ",'" + FEED_TAB + "'!$A:$C,3,FALSE),\"\")");
-  }
-  funds.getRange(t.headerRow + 1, unitsCol, Math.max(1, t.rows.length), 1).setNumberFormat('#,##0.000');
-
-  // The feed becomes the plain price list, rebuilt from the codes just moved
-  feed.clear();
-  setupNavFeed();
-  refreshNav();
-  ss.toast('Units now live on ' + FUNDS_TAB + '. NAV Feed is the price list.', 'Net Worth', 8);
 }
