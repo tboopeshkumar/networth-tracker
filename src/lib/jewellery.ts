@@ -24,11 +24,28 @@ export interface JewelSection {
   /** false for record-only sections such as exchanged or sold pieces */
   held: boolean;
   grams: number;
+  headerRow: number;
+}
+
+export interface GoldValuation {
+  /** the block's own heading, e.g. "Current gold valuation (22C)" */
+  title: string | null;
+  grams: number | null;
+  rate: number | null;
+  value: number | null;
+  note: string | null;
+  /** date the rate was taken, as written in the note */
+  rateAsOf: string | null;
+  /**
+   * The held lists the valuation covers: those placed above the valuation
+   * block. Empty unless their grams add up to the sheet's own total.
+   */
+  parts: { title: string; grams: number }[];
 }
 
 export interface Jewellery {
   sections: JewelSection[];
-  valuation: { grams: number | null; rate: number | null; value: number | null; note: string | null };
+  valuation: GoldValuation;
 }
 
 const norm = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -90,6 +107,7 @@ export function readJewellery(grid: Grid | undefined): Jewellery | null {
       rows,
       held: !/exchang|no longer|sold/i.test(title),
       grams: rows.reduce((a, r) => a + n0(r.grams), 0),
+      headerRow: h,
     });
   }
 
@@ -97,22 +115,35 @@ export function readJewellery(grid: Grid | undefined): Jewellery | null {
 
   // Valuation block: labelled rows with their figure to the right
   const find = (re: RegExp) => {
-    for (const row of grid) {
-      const c = (row ?? []).findIndex((v) => typeof v === 'string' && re.test(v));
-      if (c >= 0) return { row, c };
+    for (let i = 0; i < grid.length; i++) {
+      const row = grid[i] ?? [];
+      const c = row.findIndex((v) => typeof v === 'string' && re.test(v));
+      if (c >= 0) return { row, c, i };
     }
     return null;
   };
   const numberBy = (re: RegExp) => { const hit = find(re); return hit ? firstNumberAfter(hit.row, hit.c) : null; };
   const noteHit = find(/^value\s*=/i);
+  const titleHit = find(/gold valuation/i);
+  const grams = numberBy(/total grams/i);
+  const note = noteHit ? String(noteHit.row[noteHit.c]).trim() : null;
+
+  // The lists the valuation covers sit above its block; trust the split only
+  // when it reconciles with the sheet's own total.
+  const blockRow = titleHit?.i ?? find(/total grams/i)?.i ?? -1;
+  let parts = sections.filter((s) => s.held && s.headerRow < blockRow).map((s) => ({ title: s.title, grams: s.grams }));
+  if (!isNum(grams) || Math.abs(parts.reduce((a, s) => a + s.grams, 0) - grams) > 0.01) parts = [];
 
   return {
     sections,
     valuation: {
-      grams: numberBy(/total grams/i),
+      title: titleHit ? String(titleHit.row[titleHit.c]).trim().replace(/\s+/g, ' ') : null,
+      grams,
       rate: numberBy(/gold rate/i),
       value: numberBy(/estimated value/i),
-      note: noteHit ? String(noteHit.row[noteHit.c]).trim() : null,
+      note,
+      rateAsOf: note?.match(/rate as of\s*([0-9]{1,2}[-\s][A-Za-z]{3,9}[-\s][0-9]{4})/i)?.[1] ?? null,
+      parts,
     },
   };
 }

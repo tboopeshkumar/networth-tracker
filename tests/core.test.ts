@@ -13,7 +13,7 @@ import { test } from 'vitest';
 import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
-import { JEWELLERY_TAB } from '../src/lib/jewellery';
+import { JEWELLERY_TAB, readJewellery } from '../src/lib/jewellery';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { parseSheetId } from '../src/lib/picker';
 import {
@@ -157,6 +157,38 @@ withFixture('the jewellery register is read, and never touches a total', async (
   const { model: m2 } = await loadAll(new DemoSheets(without));
   assert.equal(m2.jewellery, null, 'a sheet without the tab still loads');
   assert.deepEqual(m2.totals, model.totals, 'totals are identical with or without jewellery');
+});
+
+withFixture('a heading typed above a jewellery list becomes its title', () => {
+  const f = fixture();
+  const grid = f.values[JEWELLERY_TAB];
+  if (!grid) return;
+  const before = readJewellery(grid)!;
+  const first = before.sections[0];
+
+  // Insert a lone label directly above the first list's header row
+  const edited = structuredClone(grid);
+  edited.splice(first.headerRow, 0, ['A New Heading']);
+  const after = readJewellery(edited)!;
+
+  assert.equal(after.sections[0].title, 'A New Heading');
+  assert.equal(after.sections[0].rows.length, first.rows.length, 'same items');
+  assert.equal(after.sections.length, before.sections.length, 'no section gained or lost');
+});
+
+withFixture('the 22C valuation combines the lists above it and reconciles', () => {
+  const f = fixture();
+  const J = readJewellery(f.values[JEWELLERY_TAB]);
+  if (!J || typeof J.valuation.grams !== 'number') return;
+  const { parts, grams } = J.valuation;
+  assert.ok(parts.length > 0, 'the lists behind the valuation were identified');
+  approx(sum(parts, 'grams'), grams, 'parts add up to the sheet total');
+  for (const p of parts) {
+    const s = J.sections.find((x) => x.title === p.title)!;
+    assert.ok(s.held, `${p.title} is a held list`);
+  }
+  // record-only sections are never part of it
+  assert.ok(J.sections.filter((s) => !s.held).every((s) => !parts.some((p) => p.title === s.title)));
 });
 
 /* ---------- writes ---------- */

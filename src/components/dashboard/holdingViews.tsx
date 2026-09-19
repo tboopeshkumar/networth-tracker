@@ -234,12 +234,5 @@ export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent'
 
 /** A line under a group's heading, where the group needs explaining. */
 export function groupNote(model: Model, group: string): string | null {
-  if (group !== JEWELLERY_GROUP || !model.jewellery) return null;
-  const { grams, rate, value, note } = model.jewellery.valuation;
-  const est = isNum(grams) && isNum(rate) && isNum(value)
-    ? ` ${num(grams)} g held ≈ ${cr(value)} at ${inr(rate)}/g.`
-    : '';
-  // The sheet's note restates the formula before its caveats; keep the caveats
-  const caveats = note?.replace(/^value\s*=[^.]*\.\s*/i, '').trim();
-  return `For reference only — not counted in your net worth.${est}${caveats ? ` ${caveats}` : ''}`;
+  return group === JEWELLERY_GROUP && model.jewellery ? 'For reference only — not counted in your net worth.' : null;
 }
