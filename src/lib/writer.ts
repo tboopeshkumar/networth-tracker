@@ -206,7 +206,7 @@ export interface Edit { value: CellValue; display: string; before?: string; labe
 /** Update fields of an existing table row. */
 export function planRowEdit(model: Model, id: SpecId, rec: Row, edits: Record<string, Edit>, title: string): Plan {
   const tbl = model.tables[id]!;
-  const headers = tbl.spec.headers as Record<string, string>;
+  const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
   return {
     title,
     changes: Object.entries(edits).map(([field, e]) => ({
@@ -242,7 +242,7 @@ export function planInsert(
   extra: { ops?: SetOp[]; changes?: Change[] } = {},
 ): Plan {
   const tbl = model.tables[id]!;
-  const headers = tbl.spec.headers as Record<string, string>;
+  const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
   const last = (model.rows[id] as Row[]).at(-1);
   const newRow = tbl.lastRow + 1;
   return {

@@ -56,6 +56,8 @@ export const SPECS = {
       fund: 'Fund', holder: 'Holder', category: 'Category', platform: 'Platform / AMC', folio: 'Folio',
       invested: 'Invested', current: 'Current', pnl: 'P&L', navDate: 'NAV Date',
     },
+    // present once units live on this tab and Current is units × the NAV Feed price
+    optionalHeaders: { code: 'AMFI code', units: 'Units' },
   }),
   equity: spec({
     tab: 'Equity', anchor: 'account', key: ['account', 'details'], end: /^total/i,

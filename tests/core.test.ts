@@ -14,6 +14,7 @@ import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
 import { JEWELLERY_TAB, readJewellery } from '../src/lib/jewellery';
+import { editorFor } from '../src/lib/editors';
 import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { parseSheetId } from '../src/lib/picker';
@@ -232,6 +233,46 @@ test('a rate read from the Rates Feed tab is traced back to its row', () => {
 });
 
 /* ---------- writes ---------- */
+
+/** The fixture as it looks after "Move units to Mutual Funds": code and units columns, Current priced from them. */
+function withUnitsOnFunds(f: Fixture): Fixture {
+  const tab = 'Mutual Funds';
+  const vals = f.values[tab];
+  const fx = f.formulas[tab];
+  const h = vals.findIndex((r) => r.includes('Fund') && r.includes('Invested'));
+  const width = Math.max(...vals[h].map((v, i) => (v === '' ? 0 : i + 1)));
+  const cur = vals[h].indexOf('Current');
+  const [code, units] = [width, width + 1];
+  const set = (g: Cell[][], r: number, c: number, v: Cell) => { while (g[r].length <= c) g[r].push(''); g[r][c] = v; };
+  for (const g of [vals, fx]) { set(g, h, code, 'AMFI code'); set(g, h, units, 'Units'); }
+  for (let r = h + 1; r < vals.length && !/^total/i.test(String(vals[r][0])); r++) {
+    if (vals[r][0] === '') continue;
+    for (const g of [vals, fx]) { set(g, r, code, 100000 + r); set(g, r, units, 10); }
+    set(fx, r, cur, `=IFERROR(L${r + 1}*VLOOKUP(K${r + 1},'NAV Feed'!$A:$C,2,FALSE),"")`);
+  }
+  return f;
+}
+
+withFixture('funds priced by the NAV Feed are edited by units, not by value', async () => {
+  const { model, data } = await loadAll(new DemoSheets(withUnitsOnFunds(fixture())));
+  const rec = model.rows.mf[0] as Row;
+  assert.equal(rec.units, 10, 'units read from the new column');
+
+  const edit = editorFor(model, data, { kind: 'row', id: 'mf', key: rec._key });
+  assert.deepEqual(edit.fields.map((x) => x.name), ['units', 'invested', 'code']);
+  const { plan, warn } = edit.build({ units: '12.5', invested: String(rec.invested), code: String(rec.code) });
+  assert.deepEqual(plan.changes.map((c) => [c.where, c.after]), [['Units', '12.5']]);
+  assert.deepEqual(warn, [], 'no formula is overwritten');
+
+  const add = editorFor(model, data, { kind: 'add', id: 'mf' });
+  const names = add.fields.map((x) => x.name);
+  assert.ok(names.includes('units') && names.includes('code') && !names.includes('current'), names.join());
+
+  // The sheet before the move still edits by value
+  const legacy = await loadAll(new DemoSheets(fixture()));
+  const old = editorFor(legacy.model, legacy.data, { kind: 'row', id: 'mf', key: legacy.model.rows.mf[0]._key });
+  assert.deepEqual(old.fields.map((x) => x.name), ['current', 'invested', 'navDate']);
+});
 
 withFixture('edit a value, then read it back', async () => {
   const demo = new DemoSheets(fixture());

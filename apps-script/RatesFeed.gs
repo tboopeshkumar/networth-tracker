@@ -51,7 +51,8 @@ function refreshRates() {
   const put = (label, fetch) => {
     try {
       const r = fetch();
-      sh.getRange(rateRow_(sh, label), 2, 1, 4).setValues([[r.value, r.source, r.date, new Date()]]);
+      const date = r.ymd ? rateDay_(r.ymd) : new Date();
+      sh.getRange(rateRow_(sh, label), 2, 1, 4).setValues([[r.value, r.source, date, new Date()]]);
     } catch (e) {
       failed.push(label + ': ' + e.message);
     }
@@ -83,9 +84,9 @@ function parseGold22_(html) {
     const col = head.findIndex((c) => /^22\s*carat/i.test(c));
     if (col < 0 || !/^date$/i.test(head[0] || '')) continue;
     for (const r of rows.slice(1)) {
-      const date = parseDayMonth_(r[0]);
+      const ymd = parseDayMonth_(r[0]);
       const value = number(r[col]);
-      if (date && value > 0) return { value, date, source: 'Gulf News' };
+      if (ymd && value > 0) return { value, ymd, source: 'Gulf News' };
     }
   }
 
@@ -94,7 +95,7 @@ function parseGold22_(html) {
     const r = rows.find((x) => /^22\s*carat/i.test(x[0] || ''));
     if (!r) continue;
     const today = r.slice(1, 4).map(number).filter((v) => v > 0);
-    if (today.length) return { value: today[today.length - 1], date: new Date(), source: 'Gulf News (today)' };
+    if (today.length) return { value: today[today.length - 1], ymd: null, source: 'Gulf News (today)' };
   }
   throw new Error('22 Carat price not found on the Gulf News page');
 }
@@ -105,12 +106,18 @@ function tableRows_(table) {
       cell.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()));
 }
 
-/** "19th Sept 2026" → Date */
+/** "19th Sept 2026" → [2026, 9, 19] */
 function parseDayMonth_(s) {
   const m = /^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{4})$/.exec((s || '').trim());
   if (!m) return null;
   const mon = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(m[2].toLowerCase());
-  return mon < 0 ? null : new Date(Number(m[3]), mon, Number(m[1]));
+  return mon < 0 ? null : [Number(m[3]), mon + 1, Number(m[1])];
+}
+
+/** Midnight of that day in the spreadsheet's time zone, not the script's. */
+function rateDay_([y, m, d]) {
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  return Utilities.parseDate(y + '-' + m + '-' + d, tz, 'yyyy-M-d');
 }
 
 /* ---------- AED → INR ---------- */
@@ -125,7 +132,7 @@ function fetchAedInr_(sh) {
     SpreadsheetApp.flush();
     const usdInr = cell.getValue();
     if (typeof usdInr !== 'number' || !(usdInr > 0)) throw new Error('Google Finance gave ' + usdInr);
-    return { value: usdInr / AED_USD_PEG, date: new Date(), source: 'Google Finance' };
+    return { value: usdInr / AED_USD_PEG, ymd: null, source: 'Google Finance' };
   } finally {
     cell.clearContent();
   }

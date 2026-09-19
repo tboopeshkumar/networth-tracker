@@ -27,6 +27,8 @@ export interface Field {
   /** typing in this field moves that date field to today */
   bumps?: string;
   aed?: boolean;
+  /** an identifier such as a scheme code: shown without grouping or decimals */
+  plain?: boolean;
 }
 
 export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed';
@@ -74,12 +76,13 @@ export function cellValue(field: Pick<Field, 'type' | 'label'>, raw: string | un
   return raw === undefined || raw.trim() === '' ? null : V.string(raw.trim());
 }
 
-export function display(field: Pick<Field, 'type' | 'aed'>, v: CellValue | null): string {
+export function display(field: Pick<Field, 'type' | 'aed' | 'plain'>, v: CellValue | null): string {
   if (!v || 'clear' in v) return '—';
   if ('formula' in v) return v.formula;
   if ('string' in v) return v.string;
   if (field.type === 'date') return fmtDate(v.number);
   if (field.type === 'money') return field.aed ? `AED ${num(v.number)}` : inr(v.number);
+  if (field.plain) return String(v.number);
   return num(v.number, 4);
 }
 
@@ -92,16 +95,32 @@ function before(field: Field, v: Cell | null | undefined): string {
 
 /* ---------- editing an existing row ---------- */
 
+const schemeCode = (value: Cell | undefined, extra: Partial<Field> = {}): Field =>
+  number('code', 'AMFI scheme code', value, { plain: true, hint: 'The fund’s code in AMFI’s NAV list; the NAV Feed looks its price up by this', ...extra });
+
+/** A fund whose current value is a formula over its units, i.e. priced by the NAV Feed. */
+function navFed(model: Model, data: SheetData, rec: Row): boolean {
+  const t = model.tables.mf;
+  return t.cols.units !== undefined && isFormula(data.formulas[t.spec.tab]?.[rec._row]?.[t.cols.current]);
+}
+
 function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | undefined): EditorDef {
   if (!rec) throw new Error('That row is no longer in the sheet. Refresh and try again.');
   const tbl = model.tables[id];
   const bump = (f: string) => ({ bumps: f });
   let name: string;
   let fields: Field[];
+  let hint: string | undefined;
   switch (id) {
     case 'mf':
       name = `${rec.fund} · ${rec.holder}`;
-      fields = [money('current', 'Current value (₹)', rec.current, bump('navDate')), money('invested', 'Invested (₹)', rec.invested), date('navDate', 'Valued on', rec.navDate)];
+      // Priced by the NAV Feed: what you own is the input, its value follows
+      if (navFed(model, data, rec)) {
+        fields = [number('units', 'Units', rec.units), money('invested', 'Invested (₹)', rec.invested), schemeCode(rec.code)];
+        hint = 'Current value is units × the latest NAV from the NAV Feed tab, so it updates as soon as you save.';
+      } else {
+        fields = [money('current', 'Current value (₹)', rec.current, bump('navDate')), money('invested', 'Invested (₹)', rec.invested), date('navDate', 'Valued on', rec.navDate)];
+      }
       break;
     case 'equity': {
       name = `${rec.account} · ${rec.details || ''}`;
@@ -131,6 +150,7 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
   const title = `Edit ${name}`;
   return {
     title,
+    hint,
     fields,
     build(vals) {
       const edits: Record<string, Edit> = {};
@@ -256,6 +276,17 @@ function addEditor(model: Model, id: AddableId): EditorDef {
 
   switch (id) {
     case 'mf':
+      if (model.tables.mf.cols.units !== undefined) {
+        return simple('mf', 'Add mutual fund', [
+          text('fund', 'Fund name', '', { required: true }), holder(model.rows.mf),
+          text('category', 'Category', '', { list: uniq(model.rows.mf.map((r) => r.category)) }),
+          text('platform', 'Platform / AMC', '', { list: uniq(model.rows.mf.map((r) => r.platform)) }),
+          text('folio', 'Folio', ''),
+          schemeCode('', { required: true }),
+          number('units', 'Units', '', { required: true }),
+          money('invested', 'Invested (₹)', '', { required: true }),
+        ], 'Current value and NAV date are copied as formulas from the fund above. They fill in after the next NAV refresh; to see it now, use Net Worth → Refresh NAVs now in the sheet.');
+      }
       return simple('mf', 'Add mutual fund', [
         text('fund', 'Fund name', '', { required: true }), holder(model.rows.mf),
         text('category', 'Category', '', { list: uniq(model.rows.mf.map((r) => r.category)) }),

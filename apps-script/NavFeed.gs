@@ -7,17 +7,21 @@
  * the script to this one spreadsheet. It runs on Google's servers under your
  * account; nothing passes through the web app.
  *
- * In the NAV Feed tab you fill in, per fund:
- *   A  AMFI scheme code   (find it at https://www.amfiindia.com/nav-history-download
- *                          or in https://www.amfiindia.com/spages/NAVAll.txt)
- *   B  Fund               (as written in your Mutual Funds tab)
- *   C  Units held         (from your CAS statement)
- * The script fills D NAV, E NAV date, G AMFI scheme name, H last refresh.
- * F is a formula: units × NAV.
+ * Your holdings live on the Mutual Funds tab, which has two extra columns:
+ *   AMFI code   (find it at https://www.amfiindia.com/nav-history-download
+ *                or in https://www.amfiindia.com/spages/NAVAll.txt)
+ *   Units       (from your CAS statement)
+ * and prices each fund with   Current  = units × VLOOKUP(code, 'NAV Feed'!A:C, 2)
+ *                             NAV Date = VLOOKUP(code, 'NAV Feed'!A:C, 3)
+ *
+ * The NAV Feed tab is a plain price list the script rewrites on every
+ * refresh, one row per code found on the Mutual Funds tab:
+ *   A AMFI code   B NAV   C NAV date   D AMFI scheme name   E Refreshed
  */
 
 const FEED_TAB = 'NAV Feed';
-const HEADERS = ['AMFI code', 'Fund', 'Units', 'NAV', 'NAV date', 'Value (₹)', 'AMFI scheme name', 'Refreshed'];
+const FUNDS_TAB = 'Mutual Funds';
+const HEADERS = ['AMFI code', 'NAV', 'NAV date', 'AMFI scheme name', 'Refreshed'];
 const SOURCES = [
   'https://www.amfiindia.com/spages/NAVAll.txt',
   'https://portal.amfiindia.com/spages/NAVAll.txt',
@@ -27,8 +31,8 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Net Worth')
     .addItem('Refresh NAVs now', 'refreshNav')
-    .addItem('Set up NAV Feed tab', 'setupNavFeed')
     .addItem('Refresh NAVs daily (7am IST)', 'installDailyTrigger')
+    .addItem('Move units to Mutual Funds (one-time)', 'moveUnitsToFunds')
     .addSeparator()
     // From RatesFeed.gs, if it's in this project
     .addItem('Refresh gold & AED rates now', 'refreshRates')
@@ -42,11 +46,12 @@ function setupNavFeed() {
   if (!sh) sh = ss.insertSheet(FEED_TAB);
   sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold');
   sh.setFrozenRows(1);
-  sh.getRange('E:E').setNumberFormat('d mmm yyyy');
-  sh.getRange('F:F').setNumberFormat('#,##,##0');
-  sh.getRange('H:H').setNumberFormat('d mmm yyyy h:mm');
+  sh.getRange('C:C').setNumberFormat('d mmm yyyy');
+  sh.getRange('E:E').setNumberFormat('d mmm yyyy h:mm');
   return sh;
 }
+
+/* ---------- AMFI ---------- */
 
 function fetchAmfi_() {
   let lastError;
@@ -78,7 +83,7 @@ function parseAmfi_(text) {
   const iDate = cols.lastIndexOf('date');
   if ([iCode, iName, iNav, iDate].some((i) => i < 0)) throw new Error('AMFI header changed: ' + head);
 
-  const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   const map = {};
   for (const line of lines) {
     const p = line.split(';');
@@ -88,37 +93,91 @@ function parseAmfi_(text) {
     if (!Number.isFinite(nav) || !d) continue;
     const name = [p[iName], iPlan >= 0 ? p[iPlan] : '', iOpt >= 0 ? p[iOpt] : '']
       .map((s) => (s || '').trim()).filter(Boolean).join(' · ');
-    map[p[iCode].trim()] = { nav, date: new Date(Number(d[3]), MON[d[2].toLowerCase()], Number(d[1])), name };
+    map[p[iCode].trim()] = { nav, ymd: [Number(d[3]), MON[d[2].toLowerCase()], Number(d[1])], name };
   }
   return map;
 }
 
+/**
+ * Midnight of a calendar day in the spreadsheet's own time zone. A plain
+ * new Date(y, m, d) is midnight in the script's zone, which can land on the
+ * previous evening in the sheet (18 Sep showing as 17 Sep 20:00).
+ */
+function navDay_([y, m, d]) {
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  return Utilities.parseDate(y + '-' + m + '-' + d, tz, 'yyyy-M-d');
+}
+
+/* ---------- the Mutual Funds tab ---------- */
+
+const norm_ = (v) => String(v == null ? '' : v).trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** The active funds table: its header row, columns by header, and fund rows (all 1-based). */
+function fundsTable_(sh) {
+  const vals = sh.getDataRange().getValues();
+  const h = vals.findIndex((r) => r.some((v) => norm_(v) === 'fund') && r.some((v) => norm_(v) === 'invested') && r.some((v) => norm_(v) === 'current'));
+  if (h < 0) throw new Error('No Fund / Invested / Current header row on ' + FUNDS_TAB);
+  const cols = {};
+  vals[h].forEach((v, c) => { if (norm_(v) && !(norm_(v) in cols)) cols[norm_(v)] = c + 1; });
+  let lastCol = 0;
+  vals[h].forEach((v, c) => { if (norm_(v)) lastCol = c + 1; });
+  const rows = [];
+  for (let i = h + 1; i < vals.length; i++) {
+    const first = norm_(vals[i][0]);
+    if (/^total/.test(first)) break;
+    if (vals[i][cols.fund - 1] !== '') rows.push(i + 1);
+  }
+  return { headerRow: h + 1, cols, lastCol, rows, vals };
+}
+
+/** Scheme codes listed on the Mutual Funds tab, in order, without repeats. */
+function fundCodes_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(FUNDS_TAB);
+  if (!sh) return [];
+  const t = fundsTable_(sh);
+  const col = t.cols['amfi code'];
+  if (!col) return [];
+  const codes = [];
+  const seen = {};
+  for (const r of t.rows) {
+    const code = t.vals[r - 1][col - 1];
+    const key = String(code).trim();
+    if (/^\d+$/.test(key) && !seen[key]) { seen[key] = true; codes.push(code); }
+  }
+  return codes;
+}
+
+/** The older layout kept Fund and Units on the NAV Feed tab. */
+function isOldFeed_(sh) {
+  return norm_(sh.getRange(1, 2).getValue()) === 'fund';
+}
+
+/* ---------- refresh ---------- */
+
 function refreshNav() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(FEED_TAB) || setupNavFeed();
-  const last = sh.getLastRow();
-  if (last < 2) return;
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(FEED_TAB) || setupNavFeed();
+  if (isOldFeed_(sh)) {
+    throw new Error('NAV Feed still holds units. Use Net Worth → Move units to Mutual Funds (one-time) first.');
+  }
+  const codes = fundCodes_();
+  if (!codes.length) {
+    throw new Error('No AMFI codes found. Add an "AMFI code" column to the ' + FUNDS_TAB + ' tab.');
+  }
 
-  const feed = parseAmfi_(fetchAmfi_());
-  const codes = sh.getRange(2, 1, last - 1, 1).getValues();
+  const amfi = parseAmfi_(fetchAmfi_());
   const now = new Date();
-  const out = [];
-  const formulas = [];
   const missing = [];
-
-  codes.forEach(([code], i) => {
-    const row = i + 2;
-    const hit = feed[String(code).trim()];
-    formulas.push(['=IF(AND(ISNUMBER(C' + row + '),ISNUMBER(D' + row + ')),C' + row + '*D' + row + ',"")']);
-    if (!code) { out.push(['', '', '']); return; }
-    if (!hit) { missing.push(code); out.push(['', '', 'Code not found in AMFI file']); return; }
-    out.push([hit.nav, hit.date, hit.name]);
+  // Codes are written back as they appear on the Mutual Funds tab, so VLOOKUP matches type for type
+  const out = codes.map((code) => {
+    const hit = amfi[String(code).trim()];
+    if (!hit) { missing.push(code); return [code, '', '', 'Code not found in AMFI file', now]; }
+    return [code, hit.nav, navDay_(hit.ymd), hit.name, now];
   });
 
-  // D NAV, E date  |  F formula  |  G scheme name  |  H refreshed
-  sh.getRange(2, 4, out.length, 2).setValues(out.map((r) => [r[0], r[1]]));
-  sh.getRange(2, 6, formulas.length, 1).setFormulas(formulas);
-  sh.getRange(2, 7, out.length, 1).setValues(out.map((r) => [r[2]]));
-  sh.getRange(2, 8, out.length, 1).setValues(out.map(() => [now]));
+  const old = sh.getLastRow();
+  if (old > 1) sh.getRange(2, 1, old - 1, HEADERS.length).clearContent();
+  sh.getRange(2, 1, out.length, HEADERS.length).setValues(out);
 
   if (missing.length) console.warn('Scheme codes not found: ' + missing.join(', '));
 }
@@ -129,4 +188,58 @@ function installDailyTrigger() {
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('refreshNav').timeBased().everyDays(1).atHour(7).inTimezone('Asia/Kolkata').create();
   SpreadsheetApp.getActive().toast('NAVs will refresh every morning around 7am IST.', 'Net Worth', 6);
+}
+
+/* ---------- one-time move from the older layout ---------- */
+
+/**
+ * Moves each fund's AMFI code and units from the NAV Feed tab onto the
+ * Mutual Funds tab (two new columns after the last one), points Current and
+ * NAV Date at the code, then turns NAV Feed into the plain price list.
+ * Checks everything first and changes nothing if a fund can't be matched.
+ */
+function moveUnitsToFunds() {
+  const ss = SpreadsheetApp.getActive();
+  const feed = ss.getSheetByName(FEED_TAB);
+  const funds = ss.getSheetByName(FUNDS_TAB);
+  if (!feed || !funds) throw new Error('Needs both the ' + FEED_TAB + ' and ' + FUNDS_TAB + ' tabs.');
+  if (!isOldFeed_(feed)) { ss.toast('Already done: NAV Feed is the plain price list.', 'Net Worth', 6); return; }
+
+  // Old NAV Feed: A code, B fund, C units
+  const byFund = {};
+  feed.getDataRange().getValues().slice(1).forEach((r) => {
+    if (norm_(r[1])) byFund[norm_(r[1])] = { code: r[0], units: r[2] };
+  });
+
+  const t = fundsTable_(funds);
+  if (t.cols['amfi code'] || t.cols.units) throw new Error(FUNDS_TAB + ' already has AMFI code / Units columns.');
+  if (!t.cols['nav date']) throw new Error('No NAV Date column on ' + FUNDS_TAB + '.');
+
+  // Only funds priced from the feed move; anything valued by hand stays as it is
+  const fed = t.rows.filter((r) => /nav feed/i.test(funds.getRange(r, t.cols.current).getFormula()));
+  const missing = fed.filter((r) => !byFund[norm_(t.vals[r - 1][t.cols.fund - 1])]);
+  if (missing.length) {
+    throw new Error('Not on NAV Feed, so nothing was changed: ' + missing.map((r) => t.vals[r - 1][t.cols.fund - 1]).join(', '));
+  }
+
+  const codeCol = t.lastCol + 1;
+  const unitsCol = t.lastCol + 2;
+  const L = (c) => funds.getRange(1, c).getA1Notation().replace(/\d+$/, '');
+  funds.getRange(t.headerRow, t.lastCol).copyTo(funds.getRange(t.headerRow, codeCol, 1, 2), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  funds.getRange(t.headerRow, codeCol, 1, 2).setValues([['AMFI code', 'Units']]);
+
+  for (const r of fed) {
+    const hit = byFund[norm_(t.vals[r - 1][t.cols.fund - 1])];
+    const code = L(codeCol) + r;
+    funds.getRange(r, codeCol, 1, 2).setValues([[hit.code, hit.units]]);
+    funds.getRange(r, t.cols.current).setFormula('=IFERROR(' + L(unitsCol) + r + "*VLOOKUP(" + code + ",'" + FEED_TAB + "'!$A:$C,2,FALSE),\"\")");
+    funds.getRange(r, t.cols['nav date']).setFormula('=IFERROR(VLOOKUP(' + code + ",'" + FEED_TAB + "'!$A:$C,3,FALSE),\"\")");
+  }
+  funds.getRange(t.headerRow + 1, unitsCol, Math.max(1, t.rows.length), 1).setNumberFormat('#,##0.000');
+
+  // The feed becomes the plain price list, rebuilt from the codes just moved
+  feed.clear();
+  setupNavFeed();
+  refreshNav();
+  ss.toast('Units now live on ' + FUNDS_TAB + '. NAV Feed is the price list.', 'Net Worth', 8);
 }

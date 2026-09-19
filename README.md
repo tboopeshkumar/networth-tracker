@@ -266,11 +266,12 @@ The app then shows each rate's date, and *Worth a look* flags the feed if it has
 
 ### Daily mutual fund NAVs
 
-`apps-script/NavFeed.gs` pulls AMFI's official daily NAV file into a `NAV Feed` tab.
+`apps-script/NavFeed.gs` pulls AMFI's official daily NAV file into a `NAV Feed` tab, a plain price list (code, NAV, NAV date, scheme name) that it rewrites on every refresh.
+
+What you hold lives on the **Mutual Funds** tab, in two columns after NAV Date: **AMFI code** (from [NAVAll.txt](https://www.amfiindia.com/spages/NAVAll.txt)) and **Units** (from your CAS statement). Each fund's *Current* is `units × VLOOKUP(code, 'NAV Feed'!A:C, 2)` and its *NAV Date* is `VLOOKUP(code, 'NAV Feed'!A:C, 3)`. The script prices every code it finds there, so a new fund needs only its code and units.
 
 1. In the sheet: **Extensions → Apps Script**, paste the file in and save, then reload the sheet.
-2. Use the **Net Worth** menu → **Set up NAV Feed tab**.
-3. For each fund, fill in column A (the AMFI scheme code, from [NAVAll.txt](https://www.amfiindia.com/spages/NAVAll.txt)), B (the fund name) and C (units, from your CAS statement).
-4. Choose **Refresh NAVs now**, then **Refresh NAVs daily (7am IST)**.
+2. Coming from the older layout (units on the NAV Feed tab)? Use **Net Worth → Move units to Mutual Funds (one-time)**. It adds the two columns, copies each fund's code and units across, rewrites Current and NAV Date to look up by code, and rebuilds NAV Feed. It checks every fund first and changes nothing if one can't be matched.
+3. **Net Worth → Refresh NAVs now**, then **Refresh NAVs daily (7am IST)**.
 
-Column F becomes units × latest NAV. To make a fund's *Current* value update itself, point it at the feed with `=VLOOKUP(A5,'NAV Feed'!B:F,5,FALSE)`. The script uses `@OnlyCurrentDoc`, so it can only access this spreadsheet. Check that each code's plan (Direct/Regular) and option (Growth/IDCW) match what you hold; column G shows AMFI's full name so you can confirm.
+In the app, editing a fund then asks for units, invested amount and scheme code; its value follows from the NAV. Check each code's plan (Direct/Regular) and option (Growth/IDCW); NAV Feed's scheme-name column shows AMFI's full name so you can confirm.
