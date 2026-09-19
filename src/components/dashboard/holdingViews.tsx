@@ -197,7 +197,49 @@ export function buildViews(model: Model): View[] {
     }));
   }
 
+  // The jewellery register: one section per list in the sheet, for reference.
+  // Nothing here feeds a total anywhere in the app.
+  model.jewellery?.sections.forEach((s, i) => {
+    if (!s.rows.length) return;
+    const paid = (r: Row) => {
+      if (!isNum(r.total)) return '—';
+      return !r.currency || /inr/i.test(String(r.currency)) ? inr(r.total) : `${String(r.currency)} ${num(r.total, 0)}`;
+    };
+    const when = (r: Row) => (isNum(r.date) ? fmtDate(r.date) : text(r.date));
+    // Some items are named after their photo file; show the name without the extension
+    const item = (r: Row) => text(r.item).replace(/\.(jpe?g|png|heic|webp)$/i, '');
+    views.push(view<Row>({
+      id: `jewels:${i}`, group: JEWELLERY_GROUP, name: s.title,
+      recs: s.rows as unknown as Row[], total: `${num(s.grams)} g`,
+      columns: [
+        { head: 'Bought', render: when },
+        { head: 'Item', name: true, render: item },
+        { head: 'Grams', num: true, render: (r) => num(r.grams, 3), className: () => 'strong' },
+        { head: 'Paid', num: true, render: paid },
+        { head: 'Shop', render: (r) => text(r.shop) },
+        { head: 'Kept at', render: (r) => text(r.location) },
+      ],
+      card: (r) => ({
+        title: item(r), value: `${num(r.grams, 3)} g`, sub: join(when(r), r.shop),
+        right: { text: paid(r) }, foot: r.location ? `Kept at ${String(r.location)}` : undefined,
+      }),
+    }));
+  });
+
   return views;
 }
 
-export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent'];
+export const JEWELLERY_GROUP = 'Jewellery · not in net worth';
+export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent', JEWELLERY_GROUP];
+
+/** A line under a group's heading, where the group needs explaining. */
+export function groupNote(model: Model, group: string): string | null {
+  if (group !== JEWELLERY_GROUP || !model.jewellery) return null;
+  const { grams, rate, value, note } = model.jewellery.valuation;
+  const est = isNum(grams) && isNum(rate) && isNum(value)
+    ? ` ${num(grams)} g held ≈ ${cr(value)} at ${inr(rate)}/g.`
+    : '';
+  // The sheet's note restates the formula before its caveats; keep the caveats
+  const caveats = note?.replace(/^value\s*=[^.]*\.\s*/i, '').trim();
+  return `For reference only — not counted in your net worth.${est}${caveats ? ` ${caveats}` : ''}`;
+}

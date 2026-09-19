@@ -6,6 +6,7 @@
 // the app, and a write always lands on the row the user meant.
 
 import { a1, colIndex, isNum, n0, type Cell } from './format';
+import { JEWELLERY_TAB, readJewellery, type Jewellery } from './jewellery';
 
 export type Grid = Cell[][];
 export type Grids = Record<string, Grid>;
@@ -104,6 +105,9 @@ export const SPECS = {
   }),
 };
 
+/** Read when present; a sheet without them still loads. */
+export const OPTIONAL_TABS = [JEWELLERY_TAB] as const;
+
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
 export const LEDGER = spec({
@@ -179,6 +183,8 @@ export interface Model {
   cells: Partial<Record<CellId, CellRef>>;
   summaries: Partial<Record<SummaryId, Summary>>;
   ledgers: Record<string, Ledger>;
+  /** Reference only: never part of any total. */
+  jewellery: Jewellery | null;
 }
 
 /* ---------- parsing ---------- */
@@ -393,7 +399,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB]) };
 }
 
 /**

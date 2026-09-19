@@ -3,7 +3,7 @@ import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
 import { Card, EditButton, type OnEdit } from '../ui';
-import { GROUP_ORDER, buildViews, type View } from './holdingViews';
+import { GROUP_ORDER, buildViews, groupNote, type View } from './holdingViews';
 
 interface Props {
   model: Model;
@@ -39,6 +39,7 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
         {groups.map(([label, vs]) => (
           <div className="hgroup" key={label}>
             <div className="hgroup-label">{label}</div>
+            {groupNote(model, label) && <div className="hgroup-note">{groupNote(model, label)}</div>}
             {vs.map((v) => (
               <details
                 key={v.id}

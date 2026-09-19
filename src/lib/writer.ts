@@ -7,7 +7,7 @@
 // ONE spreadsheets.batchUpdate, which Google applies atomically.
 
 import { a1, colLetter, isNum, n0, type Cell } from './format';
-import { TABS, buildModel, detailSheets, type Model, type Row, type SpecId } from './model';
+import { OPTIONAL_TABS, TABS, buildModel, detailSheets, type Model, type Row, type SpecId } from './model';
 import type { BatchRequest, SheetData, SheetMeta, SheetsBackend, UserEnteredValue } from './sheets';
 
 export class ConflictError extends Error {
@@ -87,8 +87,9 @@ export interface Loaded { meta: SheetMeta[]; data: SheetData; model: Model }
 
 export async function loadAll(backend: SheetsBackend): Promise<Loaded> {
   const [meta, data] = await Promise.all([backend.meta(), backend.read(TABS)]);
-  // Second pass: ledger tabs referenced from Receivables, if they exist
-  const extra = detailSheets(data.values)
+  // Second pass: ledger tabs referenced from Receivables, and optional tabs
+  // such as the jewellery register — only those that exist in this sheet
+  const extra = [...new Set([...detailSheets(data.values), ...OPTIONAL_TABS])]
     .filter((t) => !(TABS as readonly string[]).includes(t) && meta.some((m) => m.title === t));
   if (extra.length) {
     const more = await backend.read(extra);

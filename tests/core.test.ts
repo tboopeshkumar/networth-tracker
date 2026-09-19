@@ -13,6 +13,7 @@ import { test } from 'vitest';
 import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
 import { n0, type Cell } from '../src/lib/format';
+import { JEWELLERY_TAB } from '../src/lib/jewellery';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { parseSheetId } from '../src/lib/picker';
 import {
@@ -129,6 +130,33 @@ withFixture('receivables and family-loan ledgers are found and linked', async ()
       approx(r.current, sum(model.rows.givenOut, 'amount'), 'given-out line equals the list total');
     }
   }
+});
+
+withFixture('the jewellery register is read, and never touches a total', async () => {
+  const f = fixture();
+  const { model } = await loadAll(new DemoSheets(f));
+  const J = model.jewellery;
+  if (!f.values[JEWELLERY_TAB]) { assert.equal(J, null); return; }
+  assert.ok(J && J.sections.length > 0, 'sections found');
+  for (const s of J.sections) {
+    assert.equal(new Set(s.rows.map((r) => r._key)).size, s.rows.length, `${s.title}: unique keys`);
+    approx(s.grams, sum(s.rows, 'grams'), `${s.title}: grams add up`);
+  }
+  // The sheet's "total grams held" is the sum of its leading held sections
+  if (typeof J.valuation.grams === 'number') {
+    let run = 0;
+    const matches = J.sections.some((s) => { run += s.grams; return Math.abs(run - n0(J.valuation.grams)) < 0.01; });
+    assert.ok(matches, 'valuation grams reconcile with the sections');
+  }
+
+  // Removing the tab changes nothing but the jewellery itself
+  const without = structuredClone(f);
+  delete without.values[JEWELLERY_TAB];
+  delete without.formulas[JEWELLERY_TAB];
+  without.sheets = without.sheets.filter((s) => s.title !== JEWELLERY_TAB);
+  const { model: m2 } = await loadAll(new DemoSheets(without));
+  assert.equal(m2.jewellery, null, 'a sheet without the tab still loads');
+  assert.deepEqual(m2.totals, model.totals, 'totals are identical with or without jewellery');
 });
 
 /* ---------- writes ---------- */
