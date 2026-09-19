@@ -399,7 +399,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]) };
 }
 
 /**

@@ -191,6 +191,30 @@ withFixture('the 22C valuation combines the lists above it and reconciles', () =
   assert.ok(J.sections.filter((s) => !s.held).every((s) => !parts.some((p) => p.title === s.title)));
 });
 
+test('a gold rate fetched by a formula is marked live; a typed one is not', () => {
+  // Synthetic register: one list, then the valuation block
+  const grid: Cell[][] = [
+    ['Date', 'Grams', 'Item'],
+    [45000, 10, 'Ring'],
+    [],
+    ['Current gold valuation (22C)'],
+    ['Total grams (held)', '', 10],
+    ['Gold rate (Rs / gram, 22C)', '', 1000],
+    ['Estimated value', '', 10000],
+  ];
+  const formulas = structuredClone(grid);
+  formulas[5][2] = '=IMPORTXML("https://example.com/gold", "//td")';
+
+  const live = readJewellery(grid, formulas)!.valuation;
+  assert.equal(live.rate, 1000, 'the fetched value is what the app uses');
+  assert.equal(live.rateLive, true);
+
+  assert.equal(readJewellery(grid, grid)!.valuation.rateLive, false, 'typed number');
+  assert.equal(readJewellery(grid)!.valuation.rateLive, false, 'no formulas read');
+  formulas[5][2] = '=C4*1.1';
+  assert.equal(readJewellery(grid, formulas)!.valuation.rateLive, false, 'a formula that fetches nothing');
+});
+
 /* ---------- writes ---------- */
 
 withFixture('edit a value, then read it back', async () => {

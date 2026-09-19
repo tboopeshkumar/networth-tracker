@@ -10,13 +10,16 @@ const SOVEREIGN_G = 8;
  */
 export function GoldValuation({ v }: { v: Valuation }) {
   if (!isNum(v.grams)) return null;
-  const caveats = v.note?.replace(/^value\s*=[^.]*\.\s*/i, '').replace(/rate as of[^.]*\.?/i, '').trim();
+  const caveats = v.note?.replace(/^value\s*=[^.]*\.\s*/i, '').replace(/rate as of[^.]*\.?/i, '')
+    .replace(v.rateLive ? /rate:?\s*live[^.]*\.?/i : /$^/, '').trim();
 
   return (
     <div className="gold-card">
       <div className="gold-head">
         <span className="label">{v.title ?? 'Gold valuation'}</span>
-        {v.rateAsOf && <span className="gold-asof">rate as of {v.rateAsOf}</span>}
+        {v.rateLive
+          ? <span className="gold-asof gold-live">● live rate</span>
+          : v.rateAsOf && <span className="gold-asof">rate as of {v.rateAsOf}</span>}
       </div>
 
       {/* What you hold leads; its value moves with the gold rate, so it follows */}

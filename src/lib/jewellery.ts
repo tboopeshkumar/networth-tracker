@@ -36,6 +36,8 @@ export interface GoldValuation {
   note: string | null;
   /** date the rate was taken, as written in the note */
   rateAsOf: string | null;
+  /** the rate cell fetches its value (IMPORTXML, GOOGLEFINANCE, ...) */
+  rateLive: boolean;
   /**
    * The held lists the valuation covers: those placed above the valuation
    * block. Empty unless their grams add up to the sheet's own total.
@@ -65,7 +67,9 @@ const labelOnly = (row: Cell[] | undefined) => {
 
 const firstNumberAfter = (row: Cell[], col: number) => row.slice(col + 1).find(isNum) ?? null;
 
-export function readJewellery(grid: Grid | undefined): Jewellery | null {
+const FETCHES = /\b(IMPORTXML|IMPORTHTML|IMPORTDATA|IMPORTFEED|GOOGLEFINANCE)\s*\(/i;
+
+export function readJewellery(grid: Grid | undefined, formulas?: Grid): Jewellery | null {
   if (!grid) return null;
   const sections: JewelSection[] = [];
 
@@ -126,6 +130,12 @@ export function readJewellery(grid: Grid | undefined): Jewellery | null {
   const noteHit = find(/^value\s*=/i);
   const titleHit = find(/gold valuation/i);
   const grams = numberBy(/total grams/i);
+
+  // The rate is the first number right of its label; "live" when that cell fetches it
+  const rateHit = find(/gold rate/i);
+  const rateCol = rateHit ? rateHit.row.findIndex((v, j) => j > rateHit.c && isNum(v)) : -1;
+  const rate = rateHit && rateCol >= 0 ? (rateHit.row[rateCol] as number) : null;
+  const rateLive = !!rateHit && rateCol >= 0 && FETCHES.test(String(formulas?.[rateHit.i]?.[rateCol] ?? ''));
   const note = noteHit ? String(noteHit.row[noteHit.c]).trim() : null;
 
   // The lists the valuation covers sit above its block; trust the split only
@@ -139,10 +149,11 @@ export function readJewellery(grid: Grid | undefined): Jewellery | null {
     valuation: {
       title: titleHit ? String(titleHit.row[titleHit.c]).trim().replace(/\s+/g, ' ') : null,
       grams,
-      rate: numberBy(/gold rate/i),
+      rate,
       value: numberBy(/estimated value/i),
       note,
       rateAsOf: note?.match(/rate as of\s*([0-9]{1,2}[-\s][A-Za-z]{3,9}[-\s][0-9]{4})/i)?.[1] ?? null,
+      rateLive,
       parts,
     },
   };
