@@ -8,6 +8,7 @@ import {
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row, RowOf } from '../../lib/model';
+import { Pill } from '../ui';
 
 export interface Column<R> {
   head: string;
@@ -63,7 +64,7 @@ export function buildViews(model: Model): View[] {
         { head: 'Invested', num: true, render: (r) => inr(r.invested) },
         { head: 'Current', num: true, render: (r) => inr(r.current), className: () => 'strong' },
         { head: 'P&L', num: true, render: (r) => signedInr(r.pnl), className: (r) => tone(r.pnl) },
-        { head: 'Return', num: true, render: (r) => signedPct(ret(r.pnl, r.invested)), className: (r) => tone(r.pnl) },
+        { head: 'Return', num: true, render: (r) => <Pill tone={tone(r.pnl)}>{signedPct(ret(r.pnl, r.invested))}</Pill> },
         { head: 'NAV date', render: (r) => fmtDate(r.navDate) },
       ],
       card: (r) => ({
@@ -81,7 +82,7 @@ export function buildViews(model: Model): View[] {
         { head: 'Invested (INR)', num: true, render: (r) => inr(r.investedInr) },
         { head: 'Current (INR)', num: true, render: (r) => inr(r.currentInr), className: () => 'strong' },
         { head: 'P&L', num: true, render: (r) => signedInr(r.pnl), className: (r) => tone(r.pnl) },
-        { head: 'Return', num: true, render: (r) => signedPct(ret(r.pnl, r.investedInr)), className: (r) => tone(r.pnl) },
+        { head: 'Return', num: true, render: (r) => <Pill tone={tone(r.pnl)}>{signedPct(ret(r.pnl, r.investedInr))}</Pill> },
         { head: 'Priced', render: (r) => fmtDate(r.navDate) },
       ],
       card: (r) => ({

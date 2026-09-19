@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useElementWidth } from '../../hooks/useElementWidth';
 import { cr, fmtMonth, isNum } from '../../lib/format';
 import type { RowOf } from '../../lib/model';
-import { Tooltip } from './Tooltip';
+import { TIP, Tooltip } from './Tooltip';
 
 const H = 190;
 const P = { t: 10, r: 12, b: 24, l: 50 };
@@ -41,9 +41,9 @@ export function ChangeChart({ series }: { series: RowOf<'trend'>[] }) {
             return (
               <g key={d._key}>
                 <rect className={up ? 'bar-up' : 'bar-down'} x={x} y={up ? Y(d.savings) : Y(0)} width={bw}
-                  height={Math.max(1.5, Math.abs(Y(d.savings) - Y(0)))} rx={2}
+                  height={Math.max(1.5, Math.abs(Y(d.savings) - Y(0)))} rx={Math.min(3, bw / 2)}
                   onPointerEnter={show} onPointerDown={show} onPointerLeave={() => setHover(null)} />
-                {(i % every === 0 || i === pts.length - 1) && (
+                {((i % every === 0 && pts.length - 1 - i >= every / 2) || i === pts.length - 1) && (
                   <text className="tick" x={x + bw / 2} y={H - 6} textAnchor="middle">{fmtMonth(d.month)}</text>
                 )}
               </g>
@@ -53,9 +53,9 @@ export function ChangeChart({ series }: { series: RowOf<'trend'>[] }) {
       )}
       {h && hover !== null && (
         <Tooltip x={P.l + hover * slot + bw / 2} y={Math.min(Y(h.savings), Y(0))} hostWidth={W}>
-          <span className="tl">{fmtMonth(h.month)}</span>
-          <span className={`tv ${h.savings >= 0 ? 'up' : 'down'}`}>{`${h.savings >= 0 ? '+' : ''}${cr(h.savings)}`}</span>
-          {h.note ? <span className="tn">{String(h.note)}</span> : null}
+          <span className={TIP.label}>{fmtMonth(h.month)}</span>
+          <span className={`${TIP.value} ${h.savings >= 0 ? 'up' : 'down'}`}>{`${h.savings >= 0 ? '+' : ''}${cr(h.savings)}`}</span>
+          {h.note ? <span className={TIP.note}>{String(h.note)}</span> : null}
         </Tooltip>
       )}
     </div>

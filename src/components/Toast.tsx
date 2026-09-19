@@ -20,7 +20,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext value={show}>
       {children}
-      {toast && <div key={toast.id} className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
+      {toast && (
+        <div
+          key={toast.id}
+          role="status"
+          className={`fixed bottom-[calc(22px+env(safe-area-inset-bottom))] left-1/2 z-50 max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-xl px-4 py-2.5 text-[13px] font-medium shadow-[0_8px_24px_rgba(0,0,0,0.25)] ${toast.kind === 'err' ? 'bg-bad text-white' : 'bg-ink text-page'}`}
+        >
+          {toast.message}
+        </div>
+      )}
     </ToastContext>
   );
 }

@@ -4,6 +4,12 @@ import { serialToIso, todaySerial } from '../lib/format';
 import type { Model } from '../lib/model';
 import { AccessError, AuthError, type SheetData } from '../lib/sheets';
 import { ConflictError, type Plan } from '../lib/writer';
+import { BTN, BTN_PRIMARY } from './ui';
+
+const HINT = 'mb-3.5 text-[13px] text-ink-2';
+const ERR = 'mt-2.5 text-[13px] text-bad';
+const ACTIONS = 'mt-5 flex justify-end gap-2';
+const INPUT = 'w-full rounded-lg border border-line bg-sunk px-3 py-2 text-ink focus:outline-2 focus:-outline-offset-1 focus:outline-accent';
 
 interface Props {
   request: EditRequest;
@@ -33,8 +39,8 @@ export function EditorDialog({ request, model, data, sheetTitle, onWrite, onClos
   }, []);
 
   return (
-    <dialog ref={ref} className="dlg" onClose={onClose}>
-      <div className="dlg-body">
+    <dialog ref={ref} className="m-auto w-[min(560px,calc(100vw-20px))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
+      <div className="max-h-[calc(100vh-60px)] overflow-y-auto p-5 sm:p-6">
         {def instanceof Error
           ? <Problem message={def.message} onClose={() => ref.current?.close()} />
           : <Flow def={def} sheetTitle={sheetTitle} onWrite={onWrite} onDone={() => ref.current?.close()} />}
@@ -46,8 +52,8 @@ export function EditorDialog({ request, model, data, sheetTitle, onWrite, onClos
 function Problem({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <>
-      <p className="err" role="alert">{message}</p>
-      <div className="dlg-actions"><button type="button" className="btn" onClick={onClose}>Close</button></div>
+      <p className={ERR} role="alert">{message}</p>
+      <div className={ACTIONS}><button type="button" className={BTN} onClick={onClose}>Close</button></div>
     </>
   );
 }
@@ -103,32 +109,32 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
 
   if (review) {
     return (
-      <div className="dlg-review">
-        <h3>Review: {review.plan.title}</h3>
-        <p className="hint">These cells in <b>{sheetTitle}</b> will change. Nothing is written until you confirm.</p>
-        <div className="tablewrap">
-          <table className="review">
+      <div>
+        <h3 className="mb-1.5 text-base font-semibold">Review: {review.plan.title}</h3>
+        <p className={HINT}>These cells in <b>{sheetTitle}</b> will change. Nothing is written until you confirm.</p>
+        <div className="overflow-x-auto">
+          <table className="tbl">
             <thead><tr><th>Field</th><th>Cell</th><th className="num">Before</th><th className="num">After</th></tr></thead>
             <tbody>
               {review.plan.changes.map((c) => (
                 <tr key={`${c.a1}-${c.where}`}>
-                  <td>{c.where}</td><td className="mono">{c.a1}</td>
-                  <td className="num muted">{c.before}</td><td className="num strong">{c.after}</td>
+                  <td>{c.where}</td><td className="font-mono text-xs">{c.a1}</td>
+                  <td className="num text-ink-3">{c.before}</td><td className="num strong">{c.after}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {review.warn.map((w) => <p className="warn" key={w}>⚠ {w}</p>)}
+        {review.warn.map((w) => <p className="mt-2.5 rounded-lg bg-warn-soft px-3 py-2 text-[13px]" key={w}>⚠ {w}</p>)}
         {failure && (
-          <div className="err" role="alert">
-            <b>{failure.message}</b>
-            {failure.details.length > 0 && <ul>{failure.details.map((d) => <li key={d}>{d}</li>)}</ul>}
+          <div className={ERR} role="alert">
+            <b className="font-semibold">{failure.message}</b>
+            {failure.details.length > 0 && <ul className="mt-1.5 list-disc pl-5 text-ink">{failure.details.map((d) => <li key={d}>{d}</li>)}</ul>}
           </div>
         )}
-        <div className="dlg-actions">
-          <button type="button" className="btn" disabled={writing} onClick={() => setReview(null)}>Back</button>
-          <button type="button" className="btn primary" disabled={writing} onClick={() => void write()}>
+        <div className={ACTIONS}>
+          <button type="button" className={BTN} disabled={writing} onClick={() => setReview(null)}>Back</button>
+          <button type="button" className={BTN_PRIMARY} disabled={writing} onClick={() => void write()}>
             {writing ? 'Writing…' : 'Write to sheet'}
           </button>
         </div>
@@ -138,18 +144,19 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
 
   const mode = vals.mode;
   return (
-    <form className="dlg-form" onSubmit={submit} noValidate>
-      <h3>{def.title}</h3>
-      {def.hint && <p className="hint">{def.hint}</p>}
+    <form onSubmit={submit} noValidate>
+      <h3 className="mb-1.5 text-base font-semibold">{def.title}</h3>
+      {def.hint && <p className={HINT}>{def.hint}</p>}
       {def.fields.filter((f) => !f.showIf || f.showIf === mode).map((f, i) => (
-        <label className="field" key={f.name}>
-          <span>{f.label}{f.required ? ' *' : ''}</span>
+        <label className="mb-3 grid gap-1" key={f.name}>
+          <span className="text-xs font-medium text-ink-2">{f.label}{f.required ? ' *' : ''}</span>
           {f.type === 'select' ? (
-            <select ref={i === 0 ? first : undefined} name={f.name} value={vals[f.name]} onChange={(e) => change(f, e.target.value)}>
+            <select className={INPUT} ref={i === 0 ? first : undefined} name={f.name} value={vals[f.name]} onChange={(e) => change(f, e.target.value)}>
               {f.options?.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
             </select>
           ) : (
             <input
+              className={INPUT}
               ref={i === 0 ? first : undefined}
               name={f.name}
               type={f.type === 'date' ? 'date' : 'text'}
@@ -162,13 +169,13 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
             />
           )}
           {f.list && <datalist id={`${f.name}-list`}>{f.list.map((o) => <option key={o} value={o} />)}</datalist>}
-          {f.hint && <small>{f.hint}</small>}
+          {f.hint && <small className="text-[11.5px] text-ink-3">{f.hint}</small>}
         </label>
       ))}
-      {formError && <p className="err" role="alert">{formError}</p>}
-      <div className="dlg-actions">
-        <button type="button" className="btn" onClick={onDone}>Cancel</button>
-        <button type="submit" className="btn primary">Review changes</button>
+      {formError && <p className={ERR} role="alert">{formError}</p>}
+      <div className={ACTIONS}>
+        <button type="button" className={BTN} onClick={onDone}>Cancel</button>
+        <button type="submit" className={BTN_PRIMARY}>Review changes</button>
       </div>
     </form>
   );

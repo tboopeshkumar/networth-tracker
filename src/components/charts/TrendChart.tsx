@@ -2,7 +2,7 @@ import { useState, type PointerEvent } from 'react';
 import { useElementWidth } from '../../hooks/useElementWidth';
 import { cr, fmtMonth, isNum } from '../../lib/format';
 import type { RowOf } from '../../lib/model';
-import { Tooltip } from './Tooltip';
+import { TIP, Tooltip } from './Tooltip';
 
 const H = 280;
 const P = { t: 12, r: 12, b: 26, l: 50 };
@@ -33,13 +33,19 @@ export function TrendChart({ series }: { series: RowOf<'trend'>[] }) {
     <div className="chart" ref={ref}>
       {W > 0 && pts.length > 1 && (
         <svg viewBox={`0 0 ${W} ${H}`} height={H} role="img" aria-label="Net worth over time">
+          <defs>
+            <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: 'var(--s1)', stopOpacity: 0.22 }} />
+              <stop offset="100%" style={{ stopColor: 'var(--s1)', stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
           {ticks.map((v) => (
             <g key={v}>
               <line className="grid" x1={P.l} x2={P.l + iw} y1={Y(v)} y2={Y(v)} />
               <text className="tick" x={P.l - 8} y={Y(v) + 4} textAnchor="end">{`${v / 1e7} Cr`}</text>
             </g>
           ))}
-          {pts.map((d, i) => (i % every === 0 || i === pts.length - 1) && (
+          {pts.map((d, i) => ((i % every === 0 && pts.length - 1 - i >= every / 2) || i === pts.length - 1) && (
             <text key={d._key} className="tick" x={X(i)} y={H - 7} textAnchor="middle">{fmtMonth(d.month)}</text>
           ))}
           <path className="area" d={`${line}L${X(pts.length - 1)},${Y(0)}L${X(0)},${Y(0)}Z`} />
@@ -57,10 +63,10 @@ export function TrendChart({ series }: { series: RowOf<'trend'>[] }) {
       )}
       {h && hover !== null && (
         <Tooltip x={X(hover)} y={Y(h.networth)} hostWidth={W}>
-          <span className="tl">{fmtMonth(h.month)}</span>
-          <span className="tv">{cr(h.networth)}</span>
-          {isNum(h.savings) && <span className="ts">{`${h.savings >= 0 ? '+' : ''}${cr(h.savings)} vs previous`}</span>}
-          {h.note ? <span className="tn">{String(h.note)}</span> : null}
+          <span className={TIP.label}>{fmtMonth(h.month)}</span>
+          <span className={TIP.value}>{cr(h.networth)}</span>
+          {isNum(h.savings) && <span className={TIP.sub}>{`${h.savings >= 0 ? '+' : ''}${cr(h.savings)} vs previous`}</span>}
+          {h.note ? <span className={TIP.note}>{String(h.note)}</span> : null}
         </Tooltip>
       )}
     </div>

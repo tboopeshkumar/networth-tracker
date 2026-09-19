@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
@@ -54,7 +55,7 @@ function demoFixture(): Plugin {
 export default defineConfig({
   // GitHub Pages serves a project site under /<repo>/; the workflow sets this.
   base: process.env.BASE_PATH || '/',
-  plugins: [react(), contentSecurityPolicy(), demoFixture()],
+  plugins: [tailwindcss(), react(), contentSecurityPolicy(), demoFixture()],
   server: {
     // localhost only, and a fixed port: the OAuth origin is http://localhost:8080
     host: 'localhost',

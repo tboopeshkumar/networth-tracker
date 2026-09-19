@@ -1,24 +1,19 @@
+import { IconArrowDownRight, IconArrowUpRight, IconCash, IconChartLine, IconMapPin, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react';
+import type { ReactNode } from 'react';
 import { cr, fmtDate, fmtMonth, isNum, n0, pct, ret, signedCr, signedPct, tone } from '../../lib/format';
 import type { Model } from '../../lib/model';
+import { CARD, Label, Pill, cx } from '../ui';
+
+const ICON = { size: 15, stroke: 1.75, 'aria-hidden': true } as const;
 
 /** One composition figure: amount and its share of the total. */
-function ShareTile({ label, value, share }: { label: string; value: number; share: number }) {
+function ShareTile({ label, icon, value, share }: { label: string; icon: ReactNode; value: number; share: number }) {
   return (
-    <div className="card share-tile">
-      <div className="label">{label}</div>
-      <div className="share-val">{cr(value)}</div>
-      <div className="share-pct">{pct(share)}<span className="share-of"> of total</span></div>
-    </div>
-  );
-}
-
-/** A labelled figure with one line of context, coloured by gain or loss. */
-function Stat({ label, value, note, t }: { label: string; value: string; note: string; t: string }) {
-  return (
-    <div className={`stat stat-${t || 'flat'}`}>
-      <div className="label">{label}</div>
-      <div className={`stat-val ${t}`}>{value}</div>
-      <div className="stat-note">{note}</div>
+    <div className={cx(CARD, 'min-w-0 p-3.5 sm:p-4')}>
+      {/* two lines reserved on phones, so the three values line up */}
+      <Label icon={icon} className="min-h-[2lh] items-start sm:min-h-0 sm:items-center">{label}</Label>
+      <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-[22px]">{cr(value)}</div>
+      <div className="text-xs text-ink-3 tabular-nums">{pct(share)}<span className="hidden sm:inline"> of total</span></div>
     </div>
   );
 }
@@ -38,47 +33,47 @@ export function Summary({ model }: { model: Model }) {
   const months = model.rows.trend.filter((d) => isNum(d.savings));
   const latest = months.at(-1);
   const prior = model.rows.trend[model.rows.trend.findIndex((d) => d === latest) - 1];
-  const arrow = (n: unknown) => (n0(n) >= 0 ? '▲' : '▼');
 
   // Newest valuation date across the priced holdings
   const dates = [...model.rows.mf.map((x) => x.navDate), ...model.rows.equity.map((x) => x.navDate), ...model.rows.sgb.map((x) => x.valueDate)].filter(isNum);
   const newest = dates.length ? Math.max(...dates) : null;
 
+  const gainTone = tone(T.pnl);
+  const monthTone = latest ? tone(latest.savings) : '';
+
   return (
     <>
       {/* Invested leads: it's the capital actually committed, and it doesn't
           swing with the market the way current value does. */}
-      <section className="card hero-card">
-        <div className="hero-head">
-          <span className="label">Invested capital</span>
-          {newest !== null && <span className="hero-asof">valued {fmtDate(newest)}</span>}
+      <section className={cx(CARD, 'mb-3 p-5 sm:mb-4 sm:p-6')}>
+        <div className="flex items-baseline justify-between gap-3">
+          <Label>Invested capital</Label>
+          {newest !== null && <span className="whitespace-nowrap text-xs text-ink-3">valued {fmtDate(newest)}</span>}
         </div>
 
-        <div className="hero-value">{cr(T.invested)}</div>
-        <div className="hero-now"><span className="muted">now worth</span> <b>{cr(T.current)}</b></div>
+        <div className="mt-1 text-[34px] font-semibold leading-tight tracking-tight tabular-nums sm:text-[44px]">{cr(T.invested)}</div>
 
-        <div className="stats">
-          <Stat
-            label="Unrealised gain"
-            value={signedCr(T.pnl)}
-            note={`${signedPct(r)} on invested`}
-            t={tone(T.pnl)}
-          />
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[15px] text-ink-2">
+            now worth <b className="font-semibold text-ink tabular-nums">{cr(T.current)}</b>
+          </span>
+          <Pill tone={gainTone} title="Unrealised gain on invested capital" className="px-2.5 py-1 text-[13px]">
+            {gainTone === 'down' ? <IconTrendingDown {...ICON} /> : <IconTrendingUp {...ICON} />}
+            {signedCr(T.pnl)} unrealised · {signedPct(r)}
+          </Pill>
           {latest && (
-            <Stat
-              label={fmtMonth(latest.month)}
-              value={`${arrow(latest.savings)} ${signedCr(latest.savings)}`}
-              note={prior ? `change vs ${fmtMonth(prior.month)}` : 'change on the month'}
-              t={tone(latest.savings)}
-            />
+            <Pill tone={monthTone} title={prior ? `Change vs ${fmtMonth(prior.month)}` : 'Change on the month'} className="px-2.5 py-1 text-[13px]">
+              {monthTone === 'down' ? <IconArrowDownRight {...ICON} /> : <IconArrowUpRight {...ICON} />}
+              {signedCr(latest.savings)} in {fmtMonth(latest.month)}
+            </Pill>
           )}
         </div>
       </section>
 
-      <div className="grid shares">
-        <ShareTile label="Liquid cash" value={liquid} share={share(liquid)} />
-        <ShareTile label="Equity exposure" value={equity} share={share(equity)} />
-        <ShareTile label="Held in UAE" value={uae} share={share(uae)} />
+      <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-3">
+        <ShareTile label="Liquid cash" icon={<IconCash {...ICON} />} value={liquid} share={share(liquid)} />
+        <ShareTile label="Equity exposure" icon={<IconChartLine {...ICON} />} value={equity} share={share(equity)} />
+        <ShareTile label="Held in UAE" icon={<IconMapPin {...ICON} />} value={uae} share={share(uae)} />
       </div>
     </>
   );

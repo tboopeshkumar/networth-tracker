@@ -30,7 +30,7 @@ export function App() {
 
   return (
     <>
-      {DEMO && <div className="demo-banner">Demo mode — local fixture, nothing is sent to Google</div>}
+      {DEMO && <div className="bg-warn py-1 text-center text-xs font-semibold text-[#0b0b0b]">Demo mode — local fixture, nothing is sent to Google</div>}
       <Header
         sheetTitle={session?.backend.title}
         email={s.identity?.email}
@@ -42,7 +42,7 @@ export function App() {
         onDisconnect={s.revoke}
         onSignOut={() => { setEditing(null); s.lock('Signed out.'); }}
       />
-      <main className="wrap">
+      <main className="safe-main mx-auto max-w-[1180px] pt-3 sm:pt-5">
         {s.phase === 'setup' && <SetupScreen message={s.setupMessage} />}
         {s.phase === 'signin' && <SignInScreen ready={s.authReady} busy={s.busy} onSignIn={s.startSignIn} />}
         {s.phase === 'pick' && <PickScreen onPick={() => void s.pick()} onLink={(link) => void s.openLink(link)} />}

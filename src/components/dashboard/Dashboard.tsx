@@ -3,7 +3,8 @@ import { makeLinker, type ViewId } from '../../lib/links';
 import type { Loaded } from '../../lib/writer';
 import { ChangeChart } from '../charts/ChangeChart';
 import { TrendChart } from '../charts/TrendChart';
-import { Card, type OnEdit } from '../ui';
+import { IconPlus } from '@tabler/icons-react';
+import { BTN, Card, type OnEdit } from '../ui';
 import { Allocation } from './Allocation';
 import { Checks } from './Checks';
 import { Holdings } from './Holdings';
@@ -68,7 +69,7 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
       <Card
         title="Net worth over time"
         sub={`${trend.length} recorded months · ringed points carry a note`}
-        action={canEdit && <button type="button" className="btn" onClick={() => onEdit({ kind: 'add', id: 'trend' })}>+ Snapshot</button>}
+        action={canEdit && <button type="button" className={BTN} onClick={() => onEdit({ kind: 'add', id: 'trend' })}><IconPlus size={14} stroke={2} aria-hidden="true" />Snapshot</button>}
       >
         <TrendChart series={trend} />
       </Card>
