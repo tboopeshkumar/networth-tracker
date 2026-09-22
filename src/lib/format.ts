@@ -27,6 +27,8 @@ export const inr = (n: unknown): string => (isNum(n) ? `₹${Math.round(n).toLoc
 export const num = (n: unknown, dp = 2): string =>
   (isNum(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: dp }) : '—');
 
+export const usd = (n: unknown, dp = 0): string => (isNum(n) ? `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })}` : '—');
+export const signedUsd = (n: unknown) => (isNum(n) ? `${n > 0 ? '+' : ''}${usd(n)}` : '—');
 export const pct = (n: unknown): string => (isNum(n) ? `${(n * 100).toFixed(1)}%` : '—');
 
 const plus = (n: unknown) => (isNum(n) && n > 0 ? '+' : '');

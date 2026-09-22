@@ -16,6 +16,7 @@ import { n0, type Cell } from '../src/lib/format';
 import { JEWELLERY_TAB, readJewellery } from '../src/lib/jewellery';
 import { editorFor } from '../src/lib/editors';
 import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
+import { readEtoroFeed } from '../src/lib/etoroFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { parseSheetId } from '../src/lib/picker';
 import {
@@ -230,6 +231,22 @@ test('a rate read from the Rates Feed tab is traced back to its row', () => {
   assert.equal(feedRateFor(feed, '=GOOGLEFINANCE("CURRENCY:USDINR")/3.6725'), null, 'not from the feed');
   assert.equal(feedRateFor(feed, null), null);
   assert.deepEqual(readRatesFeed(undefined), []);
+});
+
+test('the eToro Feed tab is read by header, with its Total kept apart', () => {
+  const feed = readEtoroFeed([
+    ['Symbol', 'Name', 'Type', 'Units', 'Invested ($)', 'Value ($)', 'P&L ($)', 'Refreshed'],
+    ['AAA', 'Example A Inc', 'Stocks', 15, 2300, 2590, 290, 46287.3],
+    ['Copy · sometrader', 'Copy portfolio', 'Copy', '', 1500, 1340, -160, 46287.3],
+    ['Cash', 'Available balance', 'Cash', '', 1200.5, 1200.5, 0, 46287.3],
+    ['Total', '', '', '', 5000.5, 5130.5, 130, 46287.3],
+  ])!;
+  assert.deepEqual(feed.rows.map((r) => r.symbol), ['AAA', 'Copy · sometrader', 'Cash']);
+  assert.deepEqual(feed.total, { invested: 5000.5, value: 5130.5 });
+  assert.equal(feed.refreshed, 46287.3);
+  assert.equal(feed.rows[0].units, 15);
+  assert.equal(readEtoroFeed(undefined), null);
+  assert.equal(readEtoroFeed([['something else']]), null);
 });
 
 /* ---------- writes ---------- */

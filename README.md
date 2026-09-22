@@ -234,6 +234,7 @@ src/
 tests/                       Vitest; most tests need the local fixture
 apps-script/NavFeed.gs       daily AMFI NAVs, runs inside the sheet
 apps-script/RatesFeed.gs     daily 22C gold and AED → INR rates
+apps-script/EtoroFeed.gs     daily eToro positions (read-only API key)
 tools/                       fixture builder, git hooks
 .github/workflows/deploy.yml build, test, check and publish
 ```
@@ -263,6 +264,18 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 4. Point the cells at the feed: the gold rate cell `=VLOOKUP("Gold 22C (₹/g)",'Rates Feed'!A:B,2,FALSE)` and the AED → INR cell `=VLOOKUP("AED → INR",'Rates Feed'!A:B,2,FALSE)`.
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
+
+### Daily eToro portfolio
+
+`apps-script/EtoroFeed.gs` reads your real eToro portfolio through eToro's public API into an `eToro Feed` tab: one row per instrument (symbol, name, type, units, invested, value, P&L in USD), one per copy-trading portfolio, pending orders, cash, and a **Total** row. Value is eToro's own figure, amount invested plus its unrealised P&L.
+
+1. In eToro: **Settings → Trading → API Key Management → Create New Key**, environment **Real**, permission **Read** (it can see the portfolio but never trade). You also need the public API key from the [eToro API portal](https://api-portal.etoro.com/). Your account must be verified for the option to appear.
+2. In **Extensions → Apps Script**, add a script file, paste `EtoroFeed.gs`, and paste the updated `NavFeed.gs` (it adds the menu items). Save and reload the sheet.
+3. **Net Worth → Set eToro keys** and paste both. They are kept in the script's user properties, private to your Google account: never in the sheet, this repo or the web app.
+4. **Net Worth → Refresh eToro now**, then **Refresh eToro daily (7am IST)**.
+5. Point the eToro line's *Current (Local)* on the Equity tab at the feed: `=VLOOKUP("Total",'eToro Feed'!A:F,6,FALSE)`.
+
+The app lists each holding under Holdings → Investments → eToro, and *Worth a look* flags the feed if it hasn't refreshed for three days.
 
 ### Daily mutual fund NAVs
 

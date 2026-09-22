@@ -36,6 +36,11 @@ function onOpen() {
     // From RatesFeed.gs, if it's in this project
     .addItem('Refresh gold & AED rates now', 'refreshRates')
     .addItem('Refresh rates daily (11am IST)', 'installRatesTrigger')
+    .addSeparator()
+    // From EtoroFeed.gs, if it's in this project
+    .addItem('Set eToro keys', 'setEtoroKeys')
+    .addItem('Refresh eToro now', 'refreshEtoro')
+    .addItem('Refresh eToro daily (7am IST)', 'installEtoroTrigger')
     .addToUi();
 }
 

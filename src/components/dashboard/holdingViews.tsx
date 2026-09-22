@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone,
+  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, signedUsd, todaySerial, tone, usd,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row, RowOf } from '../../lib/model';
@@ -91,6 +91,7 @@ export function buildViews(model: Model): View[] {
         foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDate(r.navDate)}`),
       }),
     }),
+    ...etoroView(model),
     view<RowOf<'sgb'>>({
       id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: cr(sum(R.sgb, 'market')),
       edit: editRow('sgb'),
@@ -229,6 +230,32 @@ export function buildViews(model: Model): View[] {
   });
 
   return views;
+}
+
+/** Each eToro holding, from the eToro Feed tab; amounts in USD as eToro reports them. */
+function etoroView(model: Model): View[] {
+  const E = model.etoro;
+  if (!E?.rows.length) return [];
+  const recs = E.rows as unknown as Row[];
+  const units = (r: Row) => (isNum(r.units) ? num(r.units, r.units % 1 ? 4 : 0) : '');
+  return [view<Row>({
+    id: 'etoro', group: 'Investments', name: 'eToro', recs,
+    total: usd(E.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0)),
+    columns: [
+      { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
+      { head: 'Type', render: (r) => text(r.type) },
+      { head: 'Units', num: true, render: (r) => units(r) || '—' },
+      { head: 'Invested ($)', num: true, render: (r) => usd(r.invested) },
+      { head: 'Value ($)', num: true, render: (r) => usd(r.value), className: () => 'strong' },
+      { head: 'P&L ($)', num: true, render: (r) => (r.pnl ? signedUsd(r.pnl) : '—'), className: (r) => tone(r.pnl) },
+      { head: 'Return', num: true, render: (r) => (r.pnl ? <Pill tone={tone(r.pnl)}>{signedPct(ret(r.pnl, r.invested))}</Pill> : '—') },
+    ],
+    card: (r) => ({
+      title: text(r.symbol), value: usd(r.value), sub: join(r.name, units(r) && `${units(r)} units`),
+      right: r.pnl ? { text: `${signedUsd(r.pnl)} · ${signedPct(ret(r.pnl, r.invested))}`, tone: tone(r.pnl) } : undefined,
+      foot: isNum(r.invested) && r.type !== 'Cash' ? `Invested ${usd(r.invested)}` : undefined,
+    }),
+  })];
 }
 
 export const JEWELLERY_GROUP = 'Jewellery · not in net worth';
