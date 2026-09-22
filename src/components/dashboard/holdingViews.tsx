@@ -238,9 +238,12 @@ function etoroView(model: Model): View[] {
   if (!E?.rows.length) return [];
   const recs = E.rows as unknown as Row[];
   const units = (r: Row) => (isNum(r.units) ? num(r.units, r.units % 1 ? 4 : 0) : '');
+  const totalUsd = E.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0);
+  // The total in rupees, at the sheet's own USD → AED → INR rates (as the Equity tab converts it)
+  const usdInr = n0(model.cells.fxUsdAed?.value) * n0(model.cells.fxAedInr?.value);
   return [view<Row>({
     id: 'etoro', group: 'Investments', name: 'eToro', recs,
-    total: usd(E.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0)),
+    total: usdInr > 0 ? cr(totalUsd * usdInr) : usd(totalUsd),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
       { head: 'Type', render: (r) => text(r.type) },
