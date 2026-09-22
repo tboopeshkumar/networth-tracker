@@ -86,19 +86,22 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
       <div className="md:hidden">
         {v.recs.map((r: Row) => {
           const c = v.card(r);
+          // With nothing else to show beside the sub line, Edit sits there instead of on a row of its own
+          const inlineEdit = edit && !c.foot && !c.right;
           return (
             <div className="border-b border-grid py-2.5 last:border-0" key={r._key}>
               <div className="flex items-baseline gap-3">
                 <span className="min-w-0 flex-1 font-medium">{c.title}</span>
                 <span className="whitespace-nowrap font-semibold tabular-nums">{c.value}</span>
               </div>
-              <div className="mt-0.5 flex items-center justify-between gap-3 text-xs text-ink-3">
+              <div className="mt-0.5 flex min-h-6 items-center justify-between gap-3 text-xs text-ink-3">
                 <span className="min-w-0">{c.sub}</span>
+                {inlineEdit && <span className="-my-1 -mr-2"><EditButton request={edit(r)} onEdit={onEdit} /></span>}
                 {c.right && (c.right.tone
                   ? <Pill tone={c.right.tone as 'up' | 'down'}>{c.right.text}</Pill>
                   : <span className="whitespace-nowrap tabular-nums">{c.right.text}</span>)}
               </div>
-              {(c.foot || edit) && (
+              {(c.foot || (edit && !inlineEdit)) && (
                 <div className="mt-1.5 flex items-center justify-between gap-3 text-[11.5px] text-ink-3">
                   <span className="min-w-0 truncate">{c.foot}</span>
                   {edit && <EditButton request={edit(r)} onEdit={onEdit} />}
