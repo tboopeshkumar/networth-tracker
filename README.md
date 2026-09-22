@@ -235,6 +235,7 @@ tests/                       Vitest; most tests need the local fixture
 apps-script/NavFeed.gs       daily AMFI NAVs, runs inside the sheet
 apps-script/RatesFeed.gs     daily 22C gold and AED → INR rates
 apps-script/EtoroFeed.gs     daily eToro positions (read-only API key)
+apps-script/IbkrFeed.gs      daily IBKR positions (Flex Web Service)
 tools/                       fixture builder, git hooks
 .github/workflows/deploy.yml build, test, check and publish
 ```
@@ -276,6 +277,17 @@ The app then shows each rate's date, and *Worth a look* flags the feed if it has
 5. Point the eToro line's *Current (Local)* on the Equity tab at the feed: `=VLOOKUP("Total",'eToro Feed'!A:F,6,FALSE)`.
 
 The app lists each holding under Holdings → Investments → eToro, and *Worth a look* flags the feed if it hasn't refreshed for three days.
+
+### Daily IBKR positions
+
+`apps-script/IbkrFeed.gs` downloads an IBKR Flex Query (Open Positions and Cash Report) through the Flex Web Service into an `IBKR Feed` tab, in the account's base currency: one row per position, then cash and a **Total** row. Flex reports are statements, so values are as of the last close.
+
+1. In IBKR Client Portal: **Performance & Reports → Flex Queries → Activity Flex Query → +**. Add **Open Positions** (Options: *Summary*; fields: Currency, FX Rate To Base, Asset Class, Sub Category, Symbol, Description, Quantity, Position Value, Cost Basis Money, Level Of Detail) and **Cash Report** (fields: Currency, Ending Cash); add **Account Information** (Currency) for the base currency. Period: *Last Business Day*, format *XML*. Save and note its **Query ID**.
+2. On the same page, **Flex Web Service Configuration**: enable it and generate a **token**. It can only download reports.
+3. In **Extensions → Apps Script**, add a script file, paste `IbkrFeed.gs`, and paste the updated `NavFeed.gs` (menu items). Save and reload the sheet.
+4. **Net Worth → Set IBKR token** and enter the token and Query ID; they are kept in the script's user properties.
+5. **Net Worth → Refresh IBKR now**, then **Refresh IBKR daily (8am IST)**.
+6. Point the IBKR line on the Equity tab at the feed: *Current (Local)* `=VLOOKUP("Total",'IBKR Feed'!A:F,6,FALSE)` and *NAV Date* `=INT(VLOOKUP("Total",'IBKR Feed'!A:H,8,FALSE))`.
 
 ### Daily mutual fund NAVs
 

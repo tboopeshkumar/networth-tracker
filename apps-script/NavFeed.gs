@@ -41,6 +41,11 @@ function onOpen() {
     .addItem('Set eToro keys', 'setEtoroKeys')
     .addItem('Refresh eToro now', 'refreshEtoro')
     .addItem('Refresh eToro daily (7am IST)', 'installEtoroTrigger')
+    .addSeparator()
+    // From IbkrFeed.gs, if it's in this project
+    .addItem('Set IBKR token', 'setIbkrToken')
+    .addItem('Refresh IBKR now', 'refreshIbkr')
+    .addItem('Refresh IBKR daily (8am IST)', 'installIbkrTrigger')
     .addToUi();
 }
 

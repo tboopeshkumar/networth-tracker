@@ -3,7 +3,7 @@
 import type { Model, NetWorthRow } from './model';
 
 export type ViewId =
-  | 'mf' | 'equity' | 'etoro' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'goldUae' | 'silverUae' | 'givenOut'
+  | 'mf' | 'equity' | 'etoro' | 'ibkr' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'goldUae' | 'silverUae' | 'givenOut'
   | `ledger:${string}` | `jewels:${number}`;
 
 /** Matched on words rather than exact names, so renaming a line doesn't break it. */

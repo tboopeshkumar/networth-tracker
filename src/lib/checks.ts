@@ -74,14 +74,16 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
     }
   }
 
-  // The daily eToro Feed script stopped (key expired or revoked, API change...)
-  const etoroAt = model.etoro?.refreshed;
-  if (isNum(etoroAt) && todaySerial() - etoroAt > 3) {
-    out.push({
-      id: 'etoro-feed',
-      title: `eToro positions haven’t refreshed since ${fmtDate(etoroAt)}.`,
-      detail: 'In the sheet, use Net Worth → Refresh eToro now to see the error. An expired key needs Set eToro keys again.',
-    });
+  // A daily broker feed stopped (key or token expired, API change...)
+  for (const [feed, name, fix] of [[model.etoro, 'eToro', 'Set eToro keys'], [model.ibkr, 'IBKR', 'Set IBKR token']] as const) {
+    const at = feed?.refreshed;
+    if (isNum(at) && todaySerial() - at > 3) {
+      out.push({
+        id: `${name.toLowerCase()}-feed`,
+        title: `${name} positions haven’t refreshed since ${fmtDate(at)}.`,
+        detail: `In the sheet, use Net Worth → Refresh ${name} now to see the error. An expired key or token needs ${fix} again.`,
+      });
+    }
   }
 
   // The daily Rates Feed script stopped (trigger removed, source page changed...)

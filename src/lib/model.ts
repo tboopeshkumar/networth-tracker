@@ -8,7 +8,7 @@
 import { a1, colIndex, isNum, n0, type Cell } from './format';
 import { JEWELLERY_TAB, readJewellery, type Jewellery } from './jewellery';
 import { RATES_TAB, readRatesFeed, type FeedRate } from './ratesFeed';
-import { ETORO_TAB, readEtoroFeed, type EtoroFeed } from './etoroFeed';
+import { ETORO_TAB, IBKR_TAB, readBrokerFeed, type BrokerFeed } from './brokerFeed';
 
 export type Grid = Cell[][];
 export type Grids = Record<string, Grid>;
@@ -110,7 +110,7 @@ export const SPECS = {
 };
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -191,8 +191,9 @@ export interface Model {
   jewellery: Jewellery | null;
   /** Daily rates written by the Rates Feed script, if the sheet has that tab. */
   ratesFeed: FeedRate[];
-  /** Positions written by the eToro Feed script, if the sheet has that tab. */
-  etoro: EtoroFeed | null;
+  /** Positions written by the broker feed scripts, if the sheet has those tabs. */
+  etoro: BrokerFeed | null;
+  ibkr: BrokerFeed | null;
 }
 
 /* ---------- parsing ---------- */
@@ -407,7 +408,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readEtoroFeed(values[ETORO_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]) };
 }
 
 /**

@@ -4,9 +4,10 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, signedUsd, todaySerial, tone, usd,
+  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
+import type { BrokerFeed } from '../../lib/brokerFeed';
 import type { Ledger, Model, Row, RowOf } from '../../lib/model';
 import { Pill } from '../ui';
 
@@ -91,7 +92,8 @@ export function buildViews(model: Model): View[] {
         foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDate(r.navDate)}`),
       }),
     }),
-    ...etoroView(model),
+    ...brokerView(model, model.etoro, 'etoro', 'eToro'),
+    ...brokerView(model, model.ibkr, 'ibkr', 'IBKR'),
     view<RowOf<'sgb'>>({
       id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: cr(sum(R.sgb, 'market')),
       edit: editRow('sgb'),
@@ -232,31 +234,38 @@ export function buildViews(model: Model): View[] {
   return views;
 }
 
-/** Each eToro holding, from the eToro Feed tab; amounts in USD as eToro reports them. */
-function etoroView(model: Model): View[] {
-  const E = model.etoro;
-  if (!E?.rows.length) return [];
-  const recs = E.rows as unknown as Row[];
+/**
+ * Each holding at a broker, from its feed tab. Rows stay in the broker's
+ * currency; the section total is in rupees at the sheet's own rates, as the
+ * Equity tab converts it.
+ */
+function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr', name: string): View[] {
+  if (!feed?.rows.length) return [];
+  const recs = feed.rows as unknown as Row[];
+  const cur = feed.currency;
+  const money = (n: unknown) => (cur === 'USD' ? usd(n) : isNum(n) ? `${cur} ${num(n, 0)}` : '—');
+  const signed = (n: unknown) => (isNum(n) && n > 0 ? `+${money(n)}` : money(n));
   const units = (r: Row) => (isNum(r.units) ? num(r.units, r.units % 1 ? 4 : 0) : '');
-  const totalUsd = E.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0);
-  // The total in rupees, at the sheet's own USD → AED → INR rates (as the Equity tab converts it)
-  const usdInr = n0(model.cells.fxUsdAed?.value) * n0(model.cells.fxAedInr?.value);
+  const totalLocal = feed.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0);
+  const aedInr = n0(model.cells.fxAedInr?.value);
+  const toInr = { USD: n0(model.cells.fxUsdAed?.value) * aedInr, AED: aedInr, INR: 1 }[cur] ?? 0;
+  const sym = cur === 'USD' ? '$' : cur;
   return [view<Row>({
-    id: 'etoro', group: 'Investments', name: 'eToro', recs,
-    total: usdInr > 0 ? cr(totalUsd * usdInr) : usd(totalUsd),
+    id, group: 'Investments', name, recs,
+    total: toInr > 0 ? cr(totalLocal * toInr) : money(totalLocal),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
       { head: 'Type', render: (r) => text(r.type) },
       { head: 'Units', num: true, render: (r) => units(r) || '—' },
-      { head: 'Invested ($)', num: true, render: (r) => usd(r.invested) },
-      { head: 'Value ($)', num: true, render: (r) => usd(r.value), className: () => 'strong' },
-      { head: 'P&L ($)', num: true, render: (r) => (r.pnl ? signedUsd(r.pnl) : '—'), className: (r) => tone(r.pnl) },
+      { head: `Invested (${sym})`, num: true, render: (r) => money(r.invested) },
+      { head: `Value (${sym})`, num: true, render: (r) => money(r.value), className: () => 'strong' },
+      { head: `P&L (${sym})`, num: true, render: (r) => (r.pnl ? signed(r.pnl) : '—'), className: (r) => tone(r.pnl) },
       { head: 'Return', num: true, render: (r) => (r.pnl ? <Pill tone={tone(r.pnl)}>{signedPct(ret(r.pnl, r.invested))}</Pill> : '—') },
     ],
     card: (r) => ({
-      title: text(r.symbol), value: usd(r.value), sub: join(r.name, units(r) && `${units(r)} units`),
-      right: r.pnl ? { text: `${signedUsd(r.pnl)} · ${signedPct(ret(r.pnl, r.invested))}`, tone: tone(r.pnl) } : undefined,
-      foot: isNum(r.invested) && r.type !== 'Cash' ? `Invested ${usd(r.invested)}` : undefined,
+      title: text(r.symbol), value: money(r.value), sub: join(r.name, units(r) && `${units(r)} units`),
+      right: r.pnl ? { text: `${signed(r.pnl)} · ${signedPct(ret(r.pnl, r.invested))}`, tone: tone(r.pnl) } : undefined,
+      foot: isNum(r.invested) && r.type !== 'Cash' ? `Invested ${money(r.invested)}` : undefined,
     }),
   })];
 }
