@@ -267,7 +267,7 @@ The app then shows each rate's date, and *Worth a look* flags the feed if it has
 
 ### Daily eToro portfolio
 
-`apps-script/EtoroFeed.gs` reads your real eToro portfolio through eToro's public API into an `eToro Feed` tab: one row per instrument (symbol, name, type, units, invested, value, P&L in USD), one per copy-trading portfolio, pending orders, cash, and a **Total** row. Value is eToro's own figure, amount invested plus its unrealised P&L.
+`apps-script/EtoroFeed.gs` reads your real eToro portfolio through eToro's public API into an `eToro Feed` tab: one row per instrument (symbol, name, type, units, invested, value, P&L in USD), one per copy-trading portfolio, pending orders, cash, and a **Total** row. Value is priced from eToro's live rates: units × the current bid, converted to USD at eToro's rate.
 
 1. In eToro: **Settings → Trading → API Key Management → Create New Key**, environment **Real**, permission **Read** (it can see the portfolio but never trade). You also need the public API key from the [eToro API portal](https://api-portal.etoro.com/). Your account must be verified for the option to appear.
 2. In **Extensions → Apps Script**, add a script file, paste `EtoroFeed.gs`, and paste the updated `NavFeed.gs` (it adds the menu items). Save and reload the sheet.

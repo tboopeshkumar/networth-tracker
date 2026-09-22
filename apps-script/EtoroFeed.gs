@@ -19,7 +19,8 @@
  * copy-trading portfolio, pending orders, cash, then a Total row. Point the
  * eToro line's current value at it, e.g.
  *   =VLOOKUP("Total", 'eToro Feed'!A:F, 6, FALSE)
- * Value is eToro's own figure: amount invested + its unrealised P&L.
+ * Value is priced from eToro's live rates (the bid, converted to USD at
+ * eToro's own rate), so it doesn't depend on a P&L field in the portfolio.
  */
 
 const ETORO_TAB = 'eToro Feed';
@@ -59,15 +60,36 @@ function etoroGet_(path) {
 /* ---------- building the rows ---------- */
 
 const num_ = (v) => (typeof v === 'number' && isFinite(v) ? v : 0);
-/** What a position is worth now, by eToro's own reckoning. */
-const worth_ = (pos) => num_(pos.amount) + num_(pos.pnL);
+
+/**
+ * What a position is worth now, in USD.
+ *   rates: instrumentID → eToro's live rate { bid, ask, conversionRateBid, conversionRateAsk }
+ * A plain (unleveraged) buy is worth units × bid × the USD conversion. Shorts
+ * and leveraged positions are worth what was put in plus the price move since
+ * opening. Without a rate, falls back to any P&L eToro sent, else to cost.
+ */
+function worth_(pos, rates) {
+  const r = rates[pos.instrumentID];
+  const amount = num_(pos.amount);
+  const units = num_(pos.units);
+  if (r && num_(r.bid) > 0) {
+    const bidUsd = num_(r.bid) * (num_(r.conversionRateBid) || 1);
+    const askUsd = (num_(r.ask) || num_(r.bid)) * (num_(r.conversionRateAsk) || num_(r.conversionRateBid) || 1);
+    const openUsd = num_(pos.openRate) * (num_(pos.openConversionRate) || 1);
+    if (pos.isBuy !== false && num_(pos.leverage) <= 1) return units * bidUsd;
+    return amount + units * (pos.isBuy === false ? openUsd - askUsd : bidUsd - openUsd);
+  }
+  const pnl = typeof pos.pnL === 'number' ? pos.pnL : pos.unrealizedPnL && typeof pos.unrealizedPnL.pnL === 'number' ? pos.unrealizedPnL.pnL : 0;
+  return amount + pnl;
+}
 
 /**
  * Turns eToro's portfolio response into sheet rows. Pure (no Apps Script
  * calls), so it can be tested outside Google.
  *   info:  instrumentID → { symbol, name, type }
+ *   rates: instrumentID → live rate (see worth_)
  */
-function etoroRows_(portfolio, info, now) {
+function etoroRows_(portfolio, info, rates, now) {
   const p = portfolio.clientPortfolio || portfolio;
   const rows = [];
 
@@ -78,7 +100,7 @@ function etoroRows_(portfolio, info, now) {
     const g = byId[id] || (byId[id] = { units: 0, invested: 0, value: 0 });
     g.units += num_(pos.units) * (pos.isBuy === false ? -1 : 1);
     g.invested += num_(pos.amount);
-    g.value += worth_(pos);
+    g.value += worth_(pos, rates);
   }
   const held = Object.keys(byId).map((id) => {
     const g = byId[id];
@@ -90,7 +112,7 @@ function etoroRows_(portfolio, info, now) {
 
   // Copy-trading portfolios, one line each: their positions plus uninvested cash
   for (const m of p.mirrors || []) {
-    const value = (m.positions || []).reduce((a, pos) => a + worth_(pos), 0) + num_(m.availableAmount);
+    const value = (m.positions || []).reduce((a, pos) => a + worth_(pos, rates), 0) + num_(m.availableAmount);
     const invested = m.depositSummary != null ? num_(m.depositSummary) - num_(m.withdrawalSummary) : num_(m.initialInvestment);
     rows.push(['Copy · ' + (m.parentUsername || m.mirrorID), 'Copy portfolio', 'Copy', '', invested, value, value - invested, now]);
   }
@@ -126,19 +148,29 @@ function etoroInfo_(ids) {
   return info;
 }
 
+/** instrumentID → live rate, from eToro's market data (100 ids per call). */
+function etoroRates_(ids) {
+  const rates = {};
+  for (let i = 0; i < ids.length; i += 100) {
+    const res = etoroGet_('/market-data/instruments/rates?instrumentIds=' + ids.slice(i, i + 100).join(','));
+    for (const r of res.rates || []) rates[r.instrumentID] = r;
+  }
+  return rates;
+}
+
 /* ---------- refresh ---------- */
 
 function refreshEtoro() {
   const portfolio = etoroGet_('/trading/info/real/pnl');
   const p = portfolio.clientPortfolio || portfolio;
-  const ids = [...new Set((p.positions || []).map((pos) => pos.instrumentID))];
-  const rows = etoroRows_(portfolio, ids.length ? etoroInfo_(ids) : {}, new Date());
-
-  // eToro's own total P&L should match the sum of the positions' P&L
-  const sumPnl = (p.positions || []).reduce((a, pos) => a + num_(pos.pnL), 0);
-  if (typeof p.unrealizedPnL === 'number' && Math.abs(p.unrealizedPnL - sumPnl) > 1) {
-    console.warn('Position P&L sums to ' + sumPnl.toFixed(2) + ' but eToro reports ' + p.unrealizedPnL.toFixed(2) + ' (copy portfolios may account for the difference).');
-  }
+  const own = (p.positions || []).map((pos) => pos.instrumentID);
+  const copied = (p.mirrors || []).flatMap((m) => (m.positions || []).map((pos) => pos.instrumentID));
+  const ids = [...new Set(own)];
+  const priced = [...new Set([...own, ...copied])];
+  const rates = priced.length ? etoroRates_(priced) : {};
+  const unpriced = priced.filter((id) => !(rates[id] && rates[id].bid > 0));
+  if (unpriced.length) console.warn('No live rate for instruments ' + unpriced.join(', ') + '; valued at cost plus any P&L eToro sent.');
+  const rows = etoroRows_(portfolio, ids.length ? etoroInfo_(ids) : {}, rates, new Date());
 
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(ETORO_TAB) || ss.insertSheet(ETORO_TAB);
