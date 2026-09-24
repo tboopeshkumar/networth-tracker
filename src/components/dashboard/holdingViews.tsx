@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  cr, fmtDate, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
+  cr, fmtDate, fmtDay, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { BrokerFeed } from '../../lib/brokerFeed';
@@ -54,11 +54,19 @@ const editRow = (id: EditableRow) => (r: Row): EditRequest => ({ kind: 'row', id
 // Erases the per-view record type so views can share one array.
 const view = <R extends Row>(v: View<R>) => v as unknown as View;
 
+/** The oldest date a section is priced from: what its total is only as fresh as. */
+function oldest(dates: unknown[]): string | undefined {
+  const known = dates.filter(isNum);
+  return known.length ? fmtDay(Math.min(...known)) : undefined;
+}
+
 export function buildViews(model: Model): View[] {
   const R = model.rows;
   const views: View[] = [
     view<RowOf<'mf'>>({
       id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: cr(sum(R.mf, 'current')),
+      // The oldest NAV in the list: the date the whole total is only as fresh as
+      note: oldest(R.mf.map((r) => r.navDate)),
       edit: editRow('mf'),
       columns: [
         { head: 'Fund', name: true, render: (r) => <>{text(r.fund)}<div className="sub2">{text(r.platform)}</div></> },
@@ -72,11 +80,12 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({
         title: text(r.fund), value: inr(r.current), sub: join(r.holder, r.category, r.platform),
-        right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDate(r.navDate)}`,
+        right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDay(r.navDate)}`,
       }),
     }),
     view<RowOf<'equity'>>({
       id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, total: cr(sum(R.equity, 'currentInr')),
+      note: oldest(R.equity.map((r) => r.navDate)),
       edit: editRow('equity'),
       columns: [
         { head: 'Account', name: true, render: (r) => <>{text(r.account)}<div className="sub2">{text(r.details)}</div></> },
@@ -91,13 +100,14 @@ export function buildViews(model: Model): View[] {
       card: (r) => ({
         title: text(r.account), value: inr(r.currentInr), sub: text(r.details || r.currency || 'INR'),
         right: gain(r.pnl, r.investedInr),
-        foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDate(r.navDate)}`),
+        foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDay(r.navDate)}`),
       }),
     }),
     ...brokerView(model, model.etoro, 'etoro', 'eToro'),
     ...brokerView(model, model.ibkr, 'ibkr', 'IBKR'),
     view<RowOf<'sgb'>>({
       id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: cr(sum(R.sgb, 'market')),
+      note: oldest(R.sgb.map((r) => r.valueDate)),
       edit: editRow('sgb'),
       columns: [
         { head: 'Holding', name: true, render: (r) => text(r.holding) },
@@ -111,7 +121,7 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({
         title: text(r.holding), value: inr(r.market), sub: join(r.holder, `${num(r.qty)} g`),
-        right: gain(n0(r.market) - n0(r.cost), r.cost), foot: `Cost ${cr(r.cost)} · matures ${fmtDate(r.maturity)}`,
+        right: gain(n0(r.market) - n0(r.cost), r.cost), foot: `Cost ${cr(r.cost)} · matures ${fmtDay(r.maturity)}`,
       }),
     }),
     view<RowOf<'fd'>>({
@@ -131,7 +141,7 @@ export function buildViews(model: Model): View[] {
         return {
           title: text(r.institution), value: inr(r.amount), sub: join(r.holder, isNum(r.rate) ? `${r.rate}%` : ''),
           right: { text: status, tone: statusTone },
-          foot: join(`Matures ${fmtDate(r.maturityDate)}`, isNum(r.maturityAmount) ? `${cr(r.maturityAmount)} at maturity` : ''),
+          foot: join(`Matures ${fmtDay(r.maturityDate)}`, isNum(r.maturityAmount) ? `${cr(r.maturityAmount)} at maturity` : ''),
         };
       },
     }),
@@ -254,7 +264,7 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
   const sym = cur === 'USD' ? '$' : cur;
   return [view<Row>({
     id, group: 'Investments', name, recs,
-    note: isNum(feed.refreshed) ? `as of ${fmtDate(feed.refreshed)}` : undefined,
+    note: isNum(feed.refreshed) ? fmtDay(feed.refreshed) : undefined,
     total: toInr > 0 ? cr(totalLocal * toInr) : money(totalLocal),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },

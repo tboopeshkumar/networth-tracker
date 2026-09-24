@@ -69,6 +69,15 @@ export function fmtDate(s: unknown): string {
   return d ? `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}` : '—';
 }
 
+/** "22 Sep", carrying the year only when it isn't the current one. */
+export function fmtDay(s: unknown): string {
+  const d = serialToDate(s);
+  if (!d) return '—';
+  const year = d.getUTCFullYear();
+  const suffix = year === new Date().getFullYear() ? '' : ` '${String(year).slice(2)}`;
+  return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${suffix}`;
+}
+
 export function fmtMonth(s: unknown): string {
   const d = serialToDate(s);
   return d ? `${MON[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(2)}` : '—';
