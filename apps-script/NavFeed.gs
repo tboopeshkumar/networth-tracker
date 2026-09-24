@@ -17,11 +17,20 @@
  * The NAV Feed tab is a plain price list the script rewrites on every
  * refresh, one row per code found on the Mutual Funds tab:
  *   A AMFI code   B NAV   C NAV date   D AMFI scheme name   E Refreshed
+ *
+ * NPS works the same way. The NPS tab has a holdings table headed
+ * Scheme ID | Scheme | Units | NAV | Value | NAV date (Scheme IDs such as
+ * SM001004, from NPS Trust's NAV report), and the same refresh rewrites an
+ * "NPS Feed" price list from NPS Trust's daily NAVs:
+ *   A Scheme ID   B NAV   C NAV date   D Scheme name   E Refreshed
  */
 
 const FEED_TAB = 'NAV Feed';
 const FUNDS_TAB = 'Mutual Funds';
 const HEADERS = ['AMFI code', 'NAV', 'NAV date', 'AMFI scheme name', 'Refreshed'];
+const NPS_TAB = 'NPS';
+const NPS_FEED_TAB = 'NPS Feed';
+const NPS_URL = 'https://npstrust.org.in/nav-report-excel';
 const SOURCES = [
   'https://www.amfiindia.com/spages/NAVAll.txt',
   'https://portal.amfiindia.com/spages/NAVAll.txt',
@@ -32,6 +41,7 @@ function onOpen() {
     .createMenu('Net Worth')
     .addItem('Refresh NAVs now', 'refreshNav')
     .addItem('Refresh NAVs daily (7am IST)', 'installDailyTrigger')
+    .addItem('Refresh NPS now', 'refreshNps')
     .addSeparator()
     // From RatesFeed.gs, if it's in this project
     .addItem('Refresh gold & AED rates now', 'refreshRates')
@@ -180,6 +190,85 @@ function refreshNav() {
   sh.getRange(2, 1, out.length, HEADERS.length).setValues(out);
 
   if (missing.length) console.warn('Scheme codes not found: ' + missing.join(', '));
+
+  // NPS rides on the same daily trigger, once its tab has scheme IDs
+  if (npsSchemeIds_().length) refreshNps();
+}
+
+/* ---------- NPS ---------- */
+
+/** Scheme IDs listed under the "Scheme ID" header on the NPS tab, in order, without repeats. */
+function npsSchemeIds_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(NPS_TAB);
+  if (!sh) return [];
+  const vals = sh.getDataRange().getValues();
+  for (let r = 0; r < vals.length; r++) {
+    const c = vals[r].findIndex((v) => norm_(v) === 'scheme id');
+    if (c < 0) continue;
+    const ids = [];
+    for (let i = r + 1; i < vals.length; i++) {
+      const id = String(vals[i][c]).trim().toUpperCase();
+      if (!id) break;
+      if (/^SM\d{6}$/.test(id) && ids.indexOf(id) < 0) ids.push(id);
+    }
+    return ids;
+  }
+  return [];
+}
+
+/**
+ * NPS Trust's NAV report: tab-separated, one row per scheme, headed
+ * ID | DATE OF NAV | PFM NAME | SCHEME ID | SCHEME NAME | NAV VALUE.
+ * Columns are found by header name.
+ */
+function parseNpsNav_(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const head = lines.findIndex((l) => /scheme id/i.test(l) && /nav value/i.test(l));
+  if (head < 0) throw new Error('NPS NAV report has no header line');
+  const cols = lines[head].split('\t').map(norm_);
+  const at = (name) => cols.indexOf(name);
+  const iId = at('scheme id'), iName = at('scheme name'), iNav = at('nav value'), iDate = at('date of nav');
+  if ([iId, iName, iNav, iDate].some((i) => i < 0)) throw new Error('NPS NAV report header changed: ' + lines[head]);
+
+  const map = {};
+  for (const line of lines.slice(head + 1)) {
+    const p = line.split('\t');
+    const nav = Number(p[iNav]);
+    const d = /^(\d{4})-(\d{2})-(\d{2})/.exec((p[iDate] || '').trim());
+    if (!p[iId] || !Number.isFinite(nav) || !d) continue;
+    map[p[iId].trim().toUpperCase()] = { nav, ymd: [Number(d[1]), Number(d[2]), Number(d[3])], name: (p[iName] || '').trim().replace(/\s+/g, ' ') };
+  }
+  return map;
+}
+
+function refreshNps() {
+  const ids = npsSchemeIds_();
+  if (!ids.length) throw new Error('No Scheme IDs on the ' + NPS_TAB + ' tab. Add a table headed "Scheme ID".');
+  const res = UrlFetchApp.fetch(NPS_URL, { muteHttpExceptions: true, followRedirects: true });
+  if (res.getResponseCode() !== 200) throw new Error('NPS Trust returned HTTP ' + res.getResponseCode());
+  const navs = parseNpsNav_(res.getContentText());
+
+  const now = new Date();
+  const missing = [];
+  const out = ids.map((id) => {
+    const hit = navs[id];
+    if (!hit) { missing.push(id); return [id, '', '', 'Scheme ID not found in the NPS Trust report', now]; }
+    return [id, hit.nav, navDay_(hit.ymd), hit.name, now];
+  });
+
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(NPS_FEED_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(NPS_FEED_TAB);
+    sh.getRange(1, 1, 1, 5).setValues([['Scheme ID', 'NAV', 'NAV date', 'Scheme name', 'Refreshed']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.getRange('C:C').setNumberFormat('d mmm yyyy');
+    sh.getRange('E:E').setNumberFormat('d mmm yyyy h:mm');
+  }
+  const old = sh.getLastRow();
+  if (old > 1) sh.getRange(2, 1, old - 1, 5).clearContent();
+  sh.getRange(2, 1, out.length, 5).setValues(out);
+  if (missing.length) throw new Error('NPS scheme IDs not found: ' + missing.join(', ') + '. Check them against NPS Trust\'s NAV report.');
 }
 
 function installDailyTrigger() {

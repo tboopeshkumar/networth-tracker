@@ -188,10 +188,11 @@ function cellEditor(model: Model, path: CellPath): EditorDef {
   });
 
   const withAsOf = (field: Field, title: string): EditorDef => {
-    const asOf = model.cells.npsAsOf;
+    // When NPS is priced from scheme NAVs, "As of" is a formula over their dates: leave it alone
+    const asOf = model.cells.npsAsOf?.formula ? undefined : model.cells.npsAsOf;
     return {
       title,
-      fields: [field, date('asOf', 'As of', asOf?.value ?? todaySerial())],
+      fields: asOf || !model.cells.npsAsOf ? [field, date('asOf', 'As of', asOf?.value ?? todaySerial())] : [field],
       build(vals) {
         const v = cellValue(field, vals[field.name]);
         if (!v) throw new Error('Enter a value.');

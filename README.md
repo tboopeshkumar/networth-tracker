@@ -268,6 +268,10 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
+### Daily NPS NAVs
+
+The same `NavFeed.gs` also prices NPS from NPS Trust's daily NAV report (`npstrust.org.in/nav-report-excel`, every scheme with its Scheme ID). On the NPS tab, add a holdings table headed **Scheme ID | Scheme | Units | NAV | Value | NAV date**, one row per scheme you hold (IDs such as `SM001004`; "POP" is the route you invested through, not a separate scheme). NAV, Value and NAV date are formulas over an `NPS Feed` tab the script rewrites. Point *Gain* at `=SUM(<values>)-<invested>` and *As of* at `=MIN(<nav dates>)`; Net Worth keeps reading Invested and Current Value as before. **Net Worth → Refresh NPS now** runs it once; afterwards it rides on the daily NAV refresh.
+
 ### Daily eToro portfolio
 
 `apps-script/EtoroFeed.gs` reads your real eToro portfolio through eToro's public API into an `eToro Feed` tab: one row per instrument (symbol, name, type, units, invested, value, P&L in USD), one per copy-trading portfolio, pending orders, cash, and a **Total** row. Value is priced from eToro's live rates: units × the current bid, converted to USD at eToro's rate.

@@ -299,6 +299,24 @@ withFixture('funds priced by the NAV Feed are edited by units, not by value', as
   assert.deepEqual(old.fields.map((x) => x.name), ['current', 'invested', 'navDate']);
 });
 
+withFixture('NPS priced from scheme NAVs keeps its formulas out of the editor', async () => {
+  const f = fixture();
+  const g = f.values.NPS;
+  const gainRow = g.findIndex((r) => /^gain/i.test(String(r[0])));
+  const invRow = g.findIndex((r) => /^invested/i.test(String(r[0])));
+  const asOfCol = g.find((r) => r.some((v) => /^as of$/i.test(String(v))))!.findIndex((v) => /^as of$/i.test(String(v)));
+  f.formulas.NPS[gainRow][2] = '=SUM(E11:E13)-C5';
+  f.formulas.NPS[invRow][asOfCol] = '=MIN(F11:F13)';
+  const { model, data } = await loadAll(new DemoSheets(f));
+
+  const inv = editorFor(model, data, { kind: 'cell', path: 'cells.npsInvested' });
+  assert.deepEqual(inv.fields.map((x) => x.name), ['v'], 'no "As of" field over a formula');
+
+  const legacy = await loadAll(new DemoSheets(fixture()));
+  const old = editorFor(legacy.model, legacy.data, { kind: 'cell', path: 'cells.npsInvested' });
+  assert.deepEqual(old.fields.map((x) => x.name), ['v', 'asOf'], 'typed layout unchanged');
+});
+
 withFixture('edit a value, then read it back', async () => {
   const demo = new DemoSheets(fixture());
   const { model } = await loadAll(demo);
