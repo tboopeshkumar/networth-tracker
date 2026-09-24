@@ -82,6 +82,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
   return (
     <>
       {v.ledger && <LedgerSummary ledger={v.ledger} canEdit={canEdit} onEdit={onEdit} />}
+      {v.lead}
 
       {/* phones: one card per record */}
       <div className="md:hidden">

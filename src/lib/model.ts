@@ -107,6 +107,11 @@ export const SPECS = {
     tab: 'Receivables', anchor: 'detailSheet', key: ['account'], end: null, optional: true,
     headers: { account: 'Account', reference: 'Reference', balance: 'Balance', detailSheet: 'Detail Sheet' },
   }),
+  // Scheme holdings under the NPS summary, priced from the NPS Feed tab
+  nps: spec({
+    tab: 'NPS', anchor: 'schemeId', key: ['schemeId'], end: null, optional: true,
+    headers: { schemeId: 'Scheme ID', scheme: 'Scheme', units: 'Units', nav: 'NAV', value: 'Value', navDate: 'NAV date' },
+  }),
 };
 
 /** Read when present; a sheet without them still loads. */
@@ -178,7 +183,7 @@ export interface Ledger {
 export type CellId = 'fxAedInr' | 'fxUsdAed' | 'npsInvested' | 'npsGain' | 'npsAsOf';
 export type SummaryId = 'goldUae' | 'silverUae';
 
-type OptionalId = 'givenOut' | 'familyLoans';
+type OptionalId = 'givenOut' | 'familyLoans' | 'nps';
 
 export interface Model {
   tables: { [I in Exclude<SpecId, OptionalId>]: Table } & { [I in OptionalId]: Table | null };

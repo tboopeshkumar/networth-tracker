@@ -31,7 +31,7 @@ export interface Field {
   plain?: boolean;
 }
 
-export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed';
+export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps';
 export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend';
 export type CellPath =
   | 'cells.fxAedInr' | 'cells.fxUsdAed' | 'cells.npsInvested' | 'cells.npsGain'
@@ -105,8 +105,8 @@ function navFed(model: Model, data: SheetData, rec: Row): boolean {
 }
 
 function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | undefined): EditorDef {
-  if (!rec) throw new Error('That row is no longer in the sheet. Refresh and try again.');
   const tbl = model.tables[id];
+  if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
   const bump = (f: string) => ({ bumps: f });
   let name: string;
   let fields: Field[];
@@ -137,6 +137,11 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
     case 'fd':
       name = `${rec.institution} · ${rec.holder}`;
       fields = [money('amount', 'Amount (₹)', rec.amount), money('maturityAmount', 'Maturity amount (₹)', rec.maturityAmount), date('maturityDate', 'Maturity date', rec.maturityDate), number('rate', 'Rate %', rec.rate)];
+      break;
+    case 'nps':
+      name = String(rec.scheme || rec.schemeId);
+      fields = [number('units', 'Units', rec.units)];
+      hint = 'Value is units × the latest NAV from the NPS Feed tab. After a contribution, also update NPS contributions under Rates & other inputs.';
       break;
     case 'bankInr':
       name = `${rec.account} · ${rec.holder}`;

@@ -18,6 +18,7 @@ import { editorFor } from '../src/lib/editors';
 import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
 import { readBrokerFeed } from '../src/lib/brokerFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
+import { makeLinker } from '../src/lib/links';
 import { parseSheetId } from '../src/lib/picker';
 import {
   ConflictError, V, execute, loadAll, planCellEdit, planInsert, planMetalPurchase, planRowEdit,
@@ -315,6 +316,31 @@ withFixture('NPS priced from scheme NAVs keeps its formulas out of the editor', 
   const legacy = await loadAll(new DemoSheets(fixture()));
   const old = editorFor(legacy.model, legacy.data, { kind: 'cell', path: 'cells.npsInvested' });
   assert.deepEqual(old.fields.map((x) => x.name), ['v', 'asOf'], 'typed layout unchanged');
+});
+
+withFixture('NPS scheme holdings are listed, linked from Net Worth and edited by units', async () => {
+  const f = fixture();
+  const g = f.values.NPS;
+  const start = g.length + 2;
+  const table: Cell[][] = [
+    ['Scheme ID', 'Scheme', 'Units', 'NAV', 'Value', 'NAV date'],
+    ['SM000001', 'Example Scheme C', 100, 10, 1000, 46288],
+    ['SM000002', 'Example Scheme E', 50, 20, 1000, 46288],
+  ];
+  table.forEach((r, i) => { g[start + i] = [...r]; f.formulas.NPS[start + i] = [...r]; });
+  const { model, data } = await loadAll(new DemoSheets(f));
+
+  assert.deepEqual(model.rows.nps.map((r) => r.schemeId), ['SM000001', 'SM000002']);
+  const line = model.rows.networth.find((r) => /\bnps\b/i.test(String(r.asset)));
+  if (line) assert.equal(makeLinker(model)(line), 'nps', 'the Net Worth line drills into the schemes');
+
+  const edit = editorFor(model, data, { kind: 'row', id: 'nps', key: model.rows.nps[0]._key });
+  assert.deepEqual(edit.fields.map((x) => x.name), ['units']);
+
+  // Without the table, nothing links and the section is absent
+  const plain = await loadAll(new DemoSheets(fixture()));
+  assert.equal(plain.model.rows.nps.length, 0);
+  if (line) assert.equal(makeLinker(plain.model)(plain.model.rows.networth.find((r) => r._key === line._key)!), null);
 });
 
 withFixture('edit a value, then read it back', async () => {

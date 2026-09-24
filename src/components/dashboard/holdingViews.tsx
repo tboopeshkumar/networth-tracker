@@ -4,12 +4,12 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  cr, fmtDate, fmtDay, inr, isNum, join, n0, num, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
+  cr, fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { BrokerFeed } from '../../lib/brokerFeed';
 import type { Ledger, Model, Row, RowOf } from '../../lib/model';
-import { Pill } from '../ui';
+import { PANEL, Pill, cx } from '../ui';
 
 export interface Column<R> {
   head: string;
@@ -41,6 +41,8 @@ export interface View<R extends Row = Row> {
   /** present when rows can be edited */
   edit?: (r: R) => EditRequest;
   ledger?: Ledger;
+  /** a line above the rows, for figures that belong to the section rather than a row */
+  lead?: ReactNode;
 }
 
 const text = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : String(v));
@@ -103,6 +105,7 @@ export function buildViews(model: Model): View[] {
         foot: join(isNum(r.currentLocal) ? `${String(r.currency || '')} ${num(r.currentLocal, 0)}`.trim() : '', `Priced ${fmtDay(r.navDate)}`),
       }),
     }),
+    ...npsView(model),
     ...brokerView(model, model.etoro, 'etoro', 'eToro'),
     ...brokerView(model, model.ibkr, 'ibkr', 'IBKR'),
     view<RowOf<'sgb'>>({
@@ -244,6 +247,43 @@ export function buildViews(model: Model): View[] {
   });
 
   return views;
+}
+
+/**
+ * NPS schemes, priced from the NPS Feed tab. Contributions are recorded for
+ * the account as a whole, not per scheme, so gain is shown for the section.
+ */
+function npsView(model: Model): View[] {
+  const recs = model.rows.nps;
+  if (!recs.length) return [];
+  const value = sum(recs, 'value');
+  const invested = model.cells.npsInvested?.value;
+  const gain = isNum(invested) ? value - invested : null;
+  return [view<RowOf<'nps'>>({
+    id: 'nps', group: 'Investments', name: 'NPS', recs, total: cr(value),
+    note: oldest(recs.map((r) => r.navDate)),
+    edit: editRow('nps'),
+    lead: isNum(invested) && (
+      <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
+        <span>Contributed <b className="font-semibold tabular-nums">{cr(invested)}</b></span>
+        <span className="text-ink-3">worth {cr(value)}</span>
+        <Pill tone={tone(gain)}>{signedCr(gain)} · {signedPct(ret(gain, invested))}</Pill>
+      </div>
+    ),
+    columns: [
+      { head: 'Scheme', name: true, render: (r) => <>{text(r.scheme)}<div className="sub2">{text(r.schemeId)}</div></> },
+      { head: 'Units', num: true, render: (r) => num(r.units, 4) },
+      { head: 'NAV', num: true, render: (r) => num(r.nav, 4) },
+      { head: 'Value', num: true, render: (r) => inr(r.value), className: () => 'strong' },
+      { head: 'Share', num: true, render: (r) => pct(value ? n0(r.value) / value : null) },
+      { head: 'NAV date', render: (r) => fmtDate(r.navDate) },
+    ],
+    card: (r) => ({
+      title: text(r.scheme), value: inr(r.value), sub: join(r.schemeId, `${num(r.units, 4)} units`),
+      right: { text: pct(value ? n0(r.value) / value : null) },
+      foot: `NAV ${num(r.nav, 4)} · ${fmtDay(r.navDate)}`,
+    }),
+  })];
 }
 
 /**
