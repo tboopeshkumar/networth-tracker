@@ -56,8 +56,9 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                 >
                   <summary className="flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-sunk group-open:rounded-b-none group-open:border-b group-open:border-grid">
                     <IconChevronRight size={16} stroke={2} className="flex-none text-ink-3 transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate font-medium">{v.name}</span>
-                    <span className="rounded-full bg-sunk px-2 text-[11px] leading-[18px] text-ink-3 tabular-nums">{v.recs.length}</span>
+                    <span className="min-w-0 shrink-0 truncate font-medium">{v.name}</span>
+                    {v.note && <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{v.note}</span>}
+                    <span className={cx('rounded-full bg-sunk px-2 text-[11px] leading-[18px] text-ink-3 tabular-nums', !v.note && 'ml-auto')}>{v.recs.length}</span>
                     <span className="whitespace-nowrap font-semibold tabular-nums">{v.total}</span>
                   </summary>
                   {/* Render the body only when open: long ledgers stay cheap */}

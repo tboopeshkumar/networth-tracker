@@ -33,6 +33,8 @@ export interface View<R extends Row = Row> {
   group: string;
   name: string;
   total: string;
+  /** shown in the section header, e.g. the date the prices are from */
+  note?: string;
   recs: R[];
   columns: Column<R>[];
   card: (r: R) => CardContent;
@@ -252,6 +254,7 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
   const sym = cur === 'USD' ? '$' : cur;
   return [view<Row>({
     id, group: 'Investments', name, recs,
+    note: isNum(feed.refreshed) ? `as of ${fmtDate(feed.refreshed)}` : undefined,
     total: toInr > 0 ? cr(totalLocal * toInr) : money(totalLocal),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
