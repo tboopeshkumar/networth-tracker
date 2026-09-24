@@ -1,7 +1,7 @@
 /**
  * @OnlyCurrentDoc
  *
- * Daily 22C gold and AED → INR rates into a "Rates Feed" tab.
+ * Daily gold and AED → INR rates into a "Rates Feed" tab.
  *
  * Paste into the same Apps Script project as NavFeed.gs (Extensions → Apps
  * Script → + → Script). NavFeed.gs's Net Worth menu has the items for it.
@@ -19,8 +19,10 @@
 const RATES_TAB = 'Rates Feed';
 const RATES_HEADERS = ['Rate', 'Value', 'Source', 'Rate date', 'Refreshed'];
 const GOLD_LABEL = 'Gold 22C (₹/g)';
+const GOLD999_LABEL = 'Gold 999 (₹/g)';
 const AED_LABEL = 'AED → INR';
 const GOLD_URL = 'https://gulfnews.com/gold-forex/india-gold-prices';
+const IBJA_URL = 'https://ibjarates.com/';
 const AED_USD_PEG = 3.6725;
 
 function setupRatesFeed() {
@@ -29,7 +31,7 @@ function setupRatesFeed() {
   if (!sh) sh = ss.insertSheet(RATES_TAB);
   sh.getRange(1, 1, 1, RATES_HEADERS.length).setValues([RATES_HEADERS]).setFontWeight('bold');
   sh.setFrozenRows(1);
-  for (const label of [GOLD_LABEL, AED_LABEL]) rateRow_(sh, label);
+  for (const label of [GOLD_LABEL, GOLD999_LABEL, AED_LABEL]) rateRow_(sh, label);
   sh.getRange('D:D').setNumberFormat('d mmm yyyy');
   sh.getRange('E:E').setNumberFormat('d mmm yyyy h:mm');
   return sh;
@@ -58,6 +60,7 @@ function refreshRates() {
     }
   };
   put(GOLD_LABEL, fetchGold22_);
+  put(GOLD999_LABEL, fetchGold999_);
   put(AED_LABEL, () => fetchAedInr_(sh));
   if (failed.length) throw new Error('Rates not refreshed — ' + failed.join('; '));
 }
@@ -117,6 +120,38 @@ function parseDayMonth_(s) {
 /** The day itself as a DATE formula; a JS Date would shift with the script's time zone. */
 function rateDay_([y, m, d]) {
   return '=DATE(' + y + ',' + m + ',' + d + ')';
+}
+
+/* ---------- 999 gold, India (IBJA) ---------- */
+
+/**
+ * The rate sovereign gold bonds are redeemed at: the simple average of the
+ * IBJA 999 closing price over the previous three business days. IBJA
+ * publishes per 10 grams; this returns per gram.
+ */
+function fetchGold999_() {
+  const res = UrlFetchApp.fetch(IBJA_URL, { muteHttpExceptions: true, followRedirects: true });
+  if (res.getResponseCode() !== 200) throw new Error('IBJA returned HTTP ' + res.getResponseCode());
+  return parseIbja999_(res.getContentText());
+}
+
+function parseIbja999_(html) {
+  const tables = (html.match(/<table[\s\S]*?<\/table>/gi) || []).map(tableRows_);
+  let closes = null;
+  for (const rows of tables) {
+    const dated = rows.map((r) => {
+      const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((r[0] || '').trim());
+      const per10g = Number((r[1] || '').replace(/,/g, ''));
+      return m && per10g > 0 ? { ymd: [Number(m[3]), Number(m[2]), Number(m[1])], per10g } : null;
+    }).filter(Boolean);
+    // Both an AM and a PM table are published; the closing (PM) one comes last
+    if (dated.length >= 3) closes = dated;
+  }
+  if (!closes) throw new Error('No 999 rate table found on the IBJA page');
+
+  const used = closes.slice(0, 3);
+  const avg = used.reduce((a, d) => a + d.per10g, 0) / used.length / 10;
+  return { value: Math.round(avg * 100) / 100, ymd: used[0].ymd, source: 'IBJA 999, 3-day average' };
 }
 
 /* ---------- AED → INR ---------- */

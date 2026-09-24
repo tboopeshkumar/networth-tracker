@@ -257,12 +257,14 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 | Rate | Source |
 |---|---|
 | Gold 22C (₹/g) | Gulf News, India gold prices (the day's 22 Carat rate) |
+| Gold 999 (₹/g) | IBJA 999 closing rate, averaged over the last three business days — the formula sovereign gold bonds are redeemed at |
 | AED → INR | Google Finance USD → INR ÷ 3.6725 (the AED peg) |
 
 1. In **Extensions → Apps Script**, add a script file, paste `RatesFeed.gs` in, and also paste the updated `NavFeed.gs` (it adds the menu items). Save and reload the sheet.
 2. **Net Worth** menu → **Refresh gold & AED rates now**. The first run asks you to approve fetching from the web.
 3. **Net Worth** → **Refresh rates daily (11am IST)**.
 4. Point the cells at the feed: the gold rate cell `=VLOOKUP("Gold 22C (₹/g)",'Rates Feed'!A:B,2,FALSE)` and the AED → INR cell `=VLOOKUP("AED → INR",'Rates Feed'!A:B,2,FALSE)`.
+5. To price sovereign gold bonds from the same feed, set each row's *Market Value* to `=D5*VLOOKUP("Gold 999 (₹/g)",'Rates Feed'!A:B,2,FALSE)` (D is Qty (g)) and its *Value Date* to `=INT(VLOOKUP("Gold 999 (₹/g)",'Rates Feed'!A:D,4,FALSE))`. That values them at redemption basis, which is below their exchange price when SGBs trade at a premium.
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
