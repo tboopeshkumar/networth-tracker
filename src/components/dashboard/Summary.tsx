@@ -1,8 +1,8 @@
 import { IconArrowDownRight, IconArrowUpRight, IconCash, IconChartLine, IconMapPin, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
-import { cr, fmtDate, fmtMonth, isNum, n0, pct, ret, signedCr, signedPct, tone } from '../../lib/format';
+import { fmtDate, fmtMonth, isNum, n0, pct, ret, signedPct, tone } from '../../lib/format';
 import type { Model } from '../../lib/model';
-import { CARD, Label, Pill, cx } from '../ui';
+import { Amount, CARD, Label, Pill, cx } from '../ui';
 
 const ICON = { size: 15, stroke: 1.75, 'aria-hidden': true } as const;
 
@@ -12,7 +12,7 @@ function ShareTile({ label, icon, value, share }: { label: string; icon: ReactNo
     <div className={cx(CARD, 'min-w-0 p-3.5 sm:p-4')}>
       {/* two lines reserved on phones, so the three values line up */}
       <Label icon={icon} className="min-h-[2lh] items-start sm:min-h-0 sm:items-center">{label}</Label>
-      <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-[22px]">{cr(value)}</div>
+      <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-[22px]"><Amount value={value} /></div>
       <div className="text-xs text-ink-3 tabular-nums">{pct(share)}<span className="hidden sm:inline"> of total</span></div>
     </div>
   );
@@ -51,20 +51,20 @@ export function Summary({ model }: { model: Model }) {
           {newest !== null && <span className="whitespace-nowrap text-xs text-ink-3">valued {fmtDate(newest)}</span>}
         </div>
 
-        <div className="mt-1 text-[34px] font-semibold leading-tight tracking-tight tabular-nums sm:text-[44px]">{cr(T.invested)}</div>
+        <div className="mt-1 text-[34px] font-semibold leading-tight tracking-tight tabular-nums sm:text-[44px]"><Amount value={T.invested} /></div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-[15px] text-ink-2">
-            now worth <b className="font-semibold text-ink tabular-nums">{cr(T.current)}</b>
+            now worth <b className="font-semibold text-ink tabular-nums"><Amount value={T.current} /></b>
           </span>
           <Pill tone={gainTone} title="Unrealised gain on invested capital" className="px-2.5 py-1 text-[13px]">
             {gainTone === 'down' ? <IconTrendingDown {...ICON} /> : <IconTrendingUp {...ICON} />}
-            {signedCr(T.pnl)} unrealised · {signedPct(r)}
+            <Amount value={T.pnl} signed /> unrealised · {signedPct(r)}
           </Pill>
           {latest && (
             <Pill tone={monthTone} title={prior ? `Change vs ${fmtMonth(prior.month)}` : 'Change on the month'} className="px-2.5 py-1 text-[13px]">
               {monthTone === 'down' ? <IconArrowDownRight {...ICON} /> : <IconArrowUpRight {...ICON} />}
-              {signedCr(latest.savings)} in {fmtMonth(latest.month)}
+              <Amount value={latest.savings} signed /> in {fmtMonth(latest.month)}
             </Pill>
           )}
         </div>

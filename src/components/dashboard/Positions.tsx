@@ -1,8 +1,8 @@
 import { IconChevronRight } from '@tabler/icons-react';
-import { cr, join, ret, n0, signedCr, signedPct, tone } from '../../lib/format';
+import { join, ret, n0, signedPct, tone, signedCr } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Model, NetWorthRow } from '../../lib/model';
-import { CATEGORY_SLOT, Card, Pill, Swatch, cx } from '../ui';
+import { Amount, CATEGORY_SLOT, Card, Pill, Swatch, cx } from '../ui';
 
 interface Props {
   model: Model;
@@ -48,9 +48,9 @@ export function Positions({ model, linkOf, onDrill }: Props) {
                   <span className="block truncate text-xs text-ink-3">{join(x.category, x.location, x.holder)}</span>
                 </span>
               </span>
-              <span className="hidden text-right tabular-nums text-ink-2 sm:block">{cr(x.invested)}</span>
+              <span className="hidden text-right tabular-nums text-ink-2 sm:block"><Amount value={x.invested} /></span>
               <span className="text-right">
-                <span className="block font-semibold tabular-nums">{cr(x.current)}</span>
+                <span className="block font-semibold tabular-nums"><Amount value={x.current} /></span>
                 <span className="mt-0.5 block sm:hidden"><ReturnPill pnl={x.pnl} invested={x.invested} /></span>
               </span>
               <span className="hidden text-right sm:block"><ReturnPill pnl={x.pnl} invested={x.invested} /></span>
@@ -64,9 +64,9 @@ export function Positions({ model, linkOf, onDrill }: Props) {
 
         <div className={cx(GRID, 'bg-sunk px-4 py-3 font-semibold sm:px-5')}>
           <span>Total</span>
-          <span className="hidden text-right tabular-nums sm:block">{cr(T.invested)}</span>
+          <span className="hidden text-right tabular-nums sm:block"><Amount value={T.invested} /></span>
           <span className="text-right">
-            <span className="block tabular-nums">{cr(T.current)}</span>
+            <span className="block tabular-nums"><Amount value={T.current} /></span>
             <span className="mt-0.5 block sm:hidden"><ReturnPill pnl={T.pnl} invested={T.invested} /></span>
           </span>
           <span className="hidden text-right sm:block"><ReturnPill pnl={T.pnl} invested={T.invested} /></span>

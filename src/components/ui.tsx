@@ -1,5 +1,6 @@
 import { IconPencil, IconTrash } from '@tabler/icons-react';
-import type { ReactNode } from 'react';
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { cr, inr, isNum, signedCr, signedInr } from '../lib/format';
 import type { EditRequest } from '../lib/editors';
 
 /** Colour follows the category, never its rank (validated palette, see app.css). */
@@ -44,6 +45,35 @@ export function Label({ children, icon, className }: { children: ReactNode; icon
     <div className={cx('flex items-center gap-1.5 text-xs font-medium text-ink-3', className)}>
       {icon}{children}
     </div>
+  );
+}
+
+/* ---------- amounts ---------- */
+
+/**
+ * A rupee amount in compact form (₹6.12 Cr, ₹68.6 L) that flips to the full
+ * figure (₹6,12,40,881) on tap, and back on a second tap. A dotted underline
+ * marks it. Inside a tappable row or a section header, the tap only flips the
+ * amount. Figures already shown in full are left as plain text.
+ */
+export function Amount({ value, signed, className }: { value: unknown; signed?: boolean; className?: string }) {
+  const [full, setFull] = useState(false);
+  const compact = signed ? signedCr(value) : cr(value);
+  const exact = signed ? signedInr(value) : inr(value);
+  if (!isNum(value) || compact === exact) return <span className={className}>{compact}</span>;
+  const flip = (e: MouseEvent | KeyboardEvent) => { e.preventDefault(); e.stopPropagation(); setFull((f) => !f); };
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={full ? exact : `${compact}, tap for the exact amount`}
+      title={full ? compact : exact}
+      className={cx('cursor-pointer whitespace-nowrap underline decoration-ink-3/50 decoration-dotted underline-offset-[3px]', className)}
+      onClick={flip}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') flip(e); }}
+    >
+      {full ? exact : compact}
+    </span>
   );
 }
 

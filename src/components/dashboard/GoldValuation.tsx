@@ -1,8 +1,8 @@
 import { IconCoin } from '@tabler/icons-react';
-import { cr, fmtDate, inr, isNum, num } from '../../lib/format';
+import { fmtDate, inr, isNum, num } from '../../lib/format';
 import type { GoldValuation as Valuation } from '../../lib/jewellery';
 import { feedRateFor, type FeedRate } from '../../lib/ratesFeed';
-import { Label, PANEL, cx } from '../ui';
+import { Amount, Label, PANEL, cx } from '../ui';
 
 /** Grams per sovereign (pavan), the unit gold jewellery is usually counted in. */
 const SOVEREIGN_G = 8;
@@ -35,7 +35,7 @@ export function GoldValuation({ v, feed = [] }: { v: Valuation; feed?: FeedRate[
       </div>
       {isNum(v.value) && (
         <div className="mt-0.5 text-[13px] text-ink-2">
-          worth ≈ <b className="font-semibold text-ink tabular-nums">{cr(v.value)}</b>{isNum(v.rate) && <> at {inr(v.rate)}/g</>}
+          worth ≈ <b className="font-semibold text-ink tabular-nums"><Amount value={v.value} /></b>{isNum(v.rate) && <> at {inr(v.rate)}/g</>}
         </div>
       )}
 

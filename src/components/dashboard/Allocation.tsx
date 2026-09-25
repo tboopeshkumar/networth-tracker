@@ -1,6 +1,6 @@
-import { cr, n0, pct } from '../../lib/format';
+import { n0, pct } from '../../lib/format';
 import type { Model } from '../../lib/model';
-import { CATEGORY_SLOT, Card, Swatch, slotColor } from '../ui';
+import { Amount, CATEGORY_SLOT, Card, Swatch, slotColor } from '../ui';
 
 type Rows = Model['rows']['networth'];
 
@@ -31,7 +31,7 @@ function Bars({ entries, total, slot }: { entries: [string, number][]; total: nu
               <Swatch slot={slot(name)} /><span className="truncate">{name}</span>
             </span>
             <span className="whitespace-nowrap tabular-nums">
-              <b className="font-semibold">{cr(v)}</b> <span className="text-ink-3">{pct(total ? v / total : null)}</span>
+              <b className="font-semibold"><Amount value={v} /></b> <span className="text-ink-3">{pct(total ? v / total : null)}</span>
             </span>
           </div>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunk">

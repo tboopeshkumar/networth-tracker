@@ -9,7 +9,7 @@ import {
 import type { ViewId } from '../../lib/links';
 import type { BrokerFeed } from '../../lib/brokerFeed';
 import type { Ledger, Model, Row, RowOf } from '../../lib/model';
-import { PANEL, Pill, cx } from '../ui';
+import { Amount, PANEL, Pill, cx } from '../ui';
 
 export interface Column<R> {
   head: string;
@@ -32,7 +32,7 @@ export interface View<R extends Row = Row> {
   id: ViewId;
   group: string;
   name: string;
-  total: string;
+  total: ReactNode;
   /** shown in the section header, e.g. the date the prices are from */
   note?: string;
   recs: R[];
@@ -70,7 +70,7 @@ export function buildViews(model: Model): View[] {
   const R = model.rows;
   const views: View[] = [
     view<RowOf<'mf'>>({
-      id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: cr(sum(R.mf, 'current')),
+      id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: <Amount value={sum(R.mf, 'current')} />,
       // The oldest NAV in the list: the date the whole total is only as fresh as
       note: oldest(R.mf.map((r) => r.navDate)),
       edit: editRow('mf'),
@@ -91,7 +91,7 @@ export function buildViews(model: Model): View[] {
       }),
     }),
     view<RowOf<'equity'>>({
-      id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, total: cr(sum(R.equity, 'currentInr')),
+      id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, total: <Amount value={sum(R.equity, 'currentInr')} />,
       note: oldest(R.equity.map((r) => r.navDate)),
       edit: editRow('equity'),
       columns: [
@@ -114,7 +114,7 @@ export function buildViews(model: Model): View[] {
     ...brokerView(model, model.etoro, 'etoro', 'eToro'),
     ...brokerView(model, model.ibkr, 'ibkr', 'IBKR'),
     view<RowOf<'sgb'>>({
-      id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: cr(sum(R.sgb, 'market')),
+      id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: <Amount value={sum(R.sgb, 'market')} />,
       note: oldest(R.sgb.map((r) => r.valueDate)),
       edit: editRow('sgb'),
       columns: [
@@ -133,7 +133,7 @@ export function buildViews(model: Model): View[] {
       }),
     }),
     view<RowOf<'fd'>>({
-      id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, total: cr(sum(R.fd, 'amount')),
+      id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, total: <Amount value={sum(R.fd, 'amount')} />,
       edit: editRow('fd'),
       add: { kind: 'add', id: 'fd' },
       columns: [
@@ -155,7 +155,7 @@ export function buildViews(model: Model): View[] {
       },
     }),
     view<RowOf<'bankInr'>>({
-      id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: cr(sum(R.bankInr, 'balance')),
+      id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: <Amount value={sum(R.bankInr, 'balance')} />,
       edit: editRow('bankInr'),
       add: { kind: 'add', id: 'bankInr' },
       remove: (r) => ({ kind: 'remove', id: 'bankInr', key: r._key }),
@@ -202,7 +202,7 @@ export function buildViews(model: Model): View[] {
 
   if (R.givenOut.length) {
     views.push(view<RowOf<'givenOut'>>({
-      id: 'givenOut', group: 'Money lent', name: 'Receivables', recs: R.givenOut, total: cr(sum(R.givenOut, 'amount')),
+      id: 'givenOut', group: 'Money lent', name: 'Receivables', recs: R.givenOut, total: <Amount value={sum(R.givenOut, 'amount')} />,
       columns: [
         { head: 'Person', name: true, render: (r) => text(r.person) },
         { head: 'Given on', render: (r) => fmtDate(r.date) },
@@ -217,7 +217,7 @@ export function buildViews(model: Model): View[] {
   for (const L of Object.values(model.ledgers)) {
     const notes = (r: Row) => join(r.note, r.detail, r.interest);
     views.push(view({
-      id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, total: cr(L.balance), ledger: L,
+      id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, total: <Amount value={L.balance} />, ledger: L,
       columns: [
         { head: 'Date', render: (r) => fmtDate(r.date) },
         { head: 'Description', name: true, render: (r) => text(r.description) },
@@ -298,14 +298,14 @@ function npsView(model: Model): View[] {
   const invested = model.cells.npsInvested?.value;
   const gain = isNum(invested) ? value - invested : null;
   return [view<RowOf<'nps'>>({
-    id: 'nps', group: 'Investments', name: 'NPS', recs, total: cr(value),
+    id: 'nps', group: 'Investments', name: 'NPS', recs, total: <Amount value={value} />,
     note: oldest(recs.map((r) => r.navDate)),
     edit: editRow('nps'),
     lead: isNum(invested) && (
       <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
-        <span>Contributed <b className="font-semibold tabular-nums">{cr(invested)}</b></span>
-        <span className="text-ink-3">worth {cr(value)}</span>
-        <Pill tone={tone(gain)}>{signedCr(gain)} · {signedPct(ret(gain, invested))}</Pill>
+        <span>Contributed <b className="font-semibold tabular-nums"><Amount value={invested} /></b></span>
+        <span className="text-ink-3">worth <Amount value={value} /></span>
+        <Pill tone={tone(gain)}><Amount value={gain} signed /> · {signedPct(ret(gain, invested))}</Pill>
       </div>
     ),
     columns: [
@@ -343,7 +343,7 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
   return [view<Row>({
     id, group: 'Investments', name, recs,
     note: isNum(feed.refreshed) ? fmtDay(feed.refreshed) : undefined,
-    total: toInr > 0 ? cr(totalLocal * toInr) : money(totalLocal),
+    total: toInr > 0 ? <Amount value={totalLocal * toInr} /> : money(totalLocal),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
       { head: 'Type', render: (r) => text(r.type) },
