@@ -1,12 +1,12 @@
 // What each edit/add dialog asks for, and how its answers become a write plan.
 // Pure: the dialog component renders these and never builds plans itself.
 
-import { fmtDate, inr, isNum, isoToSerial, num, todaySerial, type Cell } from './format';
+import { a1, fmtDate, inr, isNum, isoToSerial, num, todaySerial, type Cell } from './format';
 import { isFormula, type Model, type Row, type SpecId } from './model';
 import type { SheetData } from './sheets';
 import {
   V, planCellEdit, planInsert, planMetalPurchase, planRemove, planRowEdit,
-  type CellRefLike, type CellValue, type Edit, type Plan,
+  type CellRefLike, type CellValue, type Change, type Edit, type ExecContext, type Plan, type SetOp,
 } from './writer';
 
 export type FieldType = 'money' | 'number' | 'date' | 'text' | 'select';
@@ -31,8 +31,8 @@ export interface Field {
   plain?: boolean;
 }
 
-export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps';
-export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed';
+export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed';
+export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed';
 export type CellPath =
   | 'cells.fxAedInr' | 'cells.fxUsdAed' | 'cells.npsInvested' | 'cells.npsGain'
   | 'summaries.goldUae.currentAed' | 'summaries.silverUae.sellPrice';
@@ -45,7 +45,7 @@ export type EditRequest =
   | { kind: 'remove'; id: RemovableRow; key: string };
 
 /** Rows the app offers to delete: plain lists with nothing hanging off them. */
-export type RemovableRow = 'bankInr' | 'bankAed';
+export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed';
 
 export type Values = Record<string, string>;
 
@@ -144,6 +144,13 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
       name = `${rec.institution} · ${rec.holder}`;
       fields = [money('amount', 'Amount (₹)', rec.amount), money('maturityAmount', 'Maturity amount (₹)', rec.maturityAmount), date('maturityDate', 'Maturity date', rec.maturityDate), number('rate', 'Rate %', rec.rate)];
       break;
+    case 'duesInr':
+    case 'duesAed': {
+      const aed = id === 'duesAed';
+      name = String(rec.item);
+      fields = [text('item', 'Item', rec.item, { required: true }), date('dueDate', 'Due date', rec.dueDate), money('amount', aed ? 'Amount (AED)' : 'Amount (₹)', rec.amount, { aed })];
+      break;
+    }
     case 'nps':
       name = String(rec.scheme || rec.schemeId);
       fields = [number('units', 'Units', rec.units)];
@@ -256,7 +263,30 @@ function cellEditor(model: Model, path: CellPath): EditorDef {
 
 /* ---------- adding rows ---------- */
 
-function addEditor(model: Model, id: AddableId): EditorDef {
+/**
+ * A plain =SUM(X5:X9) total doesn't grow when a row is added just below its
+ * range, so rewrite it to run from the first row through the new one.
+ * Totals written any other way (INDIRECT, custom) are left alone.
+ */
+function totalCovering(model: Model, data: SheetData, id: SpecId, field: string): { ops?: SetOp[]; changes?: Change[] } {
+  const tbl = model.tables[id];
+  if (!tbl || tbl.totalRow === null) return {};
+  const col = tbl.cols[field];
+  const f = data.formulas[tbl.spec.tab]?.[tbl.totalRow]?.[col];
+  const m = /^=\s*SUM\(\s*\$?([A-Z]{1,3})\$?(\d+)\s*:\s*\$?\1\$?(\d+)\s*\)\s*$/i.exec(String(f ?? ''));
+  if (!m) return {};
+  const letters = m[1].toUpperCase();
+  const first = Number(m[2]);
+  return {
+    changes: [{ where: 'Total', a1: a1(tbl.spec.tab, tbl.totalRow, col), before: String(f), after: `=SUM(${letters}${first}:${letters}<new row>)` }],
+    ops: [{
+      type: 'set', where: `${tbl.spec.tab} › total`, target: { kind: 'total', id, field }, expect: undefined,
+      value: ({ insertAt }: ExecContext) => V.formula(`=SUM(${letters}${first}:${letters}${(insertAt ?? tbl.lastRow + 1) + 1})`),
+    }],
+  };
+}
+
+function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
   const today = todaySerial();
   const holders = uniq([...model.rows.mf, ...model.rows.fd, ...model.rows.sgb, ...model.rows.networth].map((r) => r.holder))
     .filter((h) => h.length < 30);
@@ -319,6 +349,26 @@ function addEditor(model: Model, id: AddableId): EditorDef {
         money('balance', aed ? 'Balance (AED)' : 'Balance (₹)', '', { required: true, aed }),
       ], 'Added at the end of the list, in this table only; the table beside it and everything below stay where they are.');
     }
+    case 'duesInr':
+    case 'duesAed': {
+      const aed = id === 'duesAed';
+      const tbl = model.tables[id];
+      if (!tbl) throw new Error('That table is no longer in the sheet. Refresh and try again.');
+      const fields = [
+        text('item', 'Item', '', { required: true }),
+        date('dueDate', 'Due date', ''),
+        money('amount', aed ? 'Amount (AED)' : 'Amount (₹)', '', { required: true, aed }),
+      ];
+      const title = aed ? 'Add AED due' : 'Add INR due';
+      return {
+        title, fields,
+        hint: 'Added at the end of the list, in this table only. Its total is widened to include it.',
+        build(vals) {
+          const { cells, shown } = collect(fields, vals);
+          return { plan: planInsert(model, id, cells, shown, title, totalCovering(model, data, id, 'amount')), warn: [] };
+        },
+      };
+    }
     case 'fd':
       return simple('fd', 'Add fixed deposit', [
         date('date', 'Invested on', today, { required: true }),
@@ -367,18 +417,22 @@ function addEditor(model: Model, id: AddableId): EditorDef {
 function removeEditor(model: Model, id: RemovableRow, rec: Row | undefined): EditorDef {
   const tbl = model.tables[id];
   if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
-  const title = `Delete ${String(rec.account)} · ${String(rec.holder)}`;
-  const aed = id === 'bankAed';
-  const balance = isNum(rec.balance) && rec.balance !== 0 ? (aed ? `AED ${num(rec.balance)}` : inr(rec.balance)) : null;
+  const due = id === 'duesInr' || id === 'duesAed';
+  const aed = id === 'bankAed' || id === 'duesAed';
+  const title = due ? `Delete ${String(rec.item)}` : `Delete ${String(rec.account)} · ${String(rec.holder)}`;
+  const amount = due ? rec.amount : rec.balance;
+  const shown = isNum(amount) && amount !== 0 ? (aed ? `AED ${num(amount)}` : inr(amount)) : null;
   return {
     title,
     danger: true,
-    hint: `Removes this account's row from ${tbl.spec.tab}. The accounts below it move up; totals and everything else on the tab stay where they are.`,
+    hint: `Removes this ${due ? 'item' : "account's row"} from ${tbl.spec.tab}. The rows below it move up; totals and everything else on the tab stay where they are.`,
     fields: [],
     build() {
       return {
         plan: planRemove(model, id, rec, title),
-        warn: balance ? [`Its balance of ${balance} drops out of your totals and net worth.`] : [],
+        warn: shown
+          ? [due ? `${shown} stops being deducted, so your available cash and net worth go up by it.` : `Its balance of ${shown} drops out of your totals and net worth.`]
+          : [],
       };
     },
   };
@@ -410,7 +464,7 @@ export function editorFor(model: Model, data: SheetData, req: EditRequest): Edit
   switch (req.kind) {
     case 'row': return rowEditor(model, data, req.id, (model.rows[req.id] as Row[]).find((r) => r._key === req.key));
     case 'cell': return cellEditor(model, req.path);
-    case 'add': return addEditor(model, req.id);
+    case 'add': return addEditor(model, data, req.id);
     case 'link': return linkEditor(model, req.sheet);
     case 'remove': return removeEditor(model, req.id, (model.rows[req.id] as Row[]).find((r) => r._key === req.key));
   }

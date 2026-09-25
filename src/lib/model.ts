@@ -111,6 +111,15 @@ export const SPECS = {
     tab: 'Receivables', anchor: 'detailSheet', key: ['account'], end: null, optional: true,
     headers: { account: 'Account', reference: 'Reference', balance: 'Balance', detailSheet: 'Detail Sheet' },
   }),
+  // Dues / pending expenses under each bank table; the sheet subtracts them from cash
+  duesInr: spec({
+    tab: 'Bank Balances', anchor: 'amount', key: ['item', 'dueDate'], end: /total/i, optional: true, sideBySide: true,
+    headers: { item: 'Item', dueDate: 'Due Date', amount: 'Amount (INR)' },
+  }),
+  duesAed: spec({
+    tab: 'Bank Balances', anchor: 'amount', key: ['item', 'dueDate'], end: /total/i, optional: true, sideBySide: true,
+    headers: { item: 'Item', dueDate: 'Due Date', amount: 'Amount (AED)' },
+  }),
   // Scheme holdings under the NPS summary, priced from the NPS Feed tab
   nps: spec({
     tab: 'NPS', anchor: 'schemeId', key: ['schemeId'], end: null, optional: true,
@@ -187,7 +196,7 @@ export interface Ledger {
 export type CellId = 'fxAedInr' | 'fxUsdAed' | 'npsInvested' | 'npsGain' | 'npsAsOf';
 export type SummaryId = 'goldUae' | 'silverUae';
 
-type OptionalId = 'givenOut' | 'familyLoans' | 'nps';
+type OptionalId = 'givenOut' | 'familyLoans' | 'nps' | 'duesInr' | 'duesAed';
 
 export interface Model {
   tables: { [I in Exclude<SpecId, OptionalId>]: Table } & { [I in OptionalId]: Table | null };

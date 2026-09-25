@@ -178,6 +178,8 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({ title: text(r.account), value: `AED ${num(r.balance, 0)}`, sub: text(r.holder) }),
     }),
+    ...duesView(model, 'duesInr'),
+    ...duesView(model, 'duesAed'),
     ...(['goldUae', 'silverUae'] as const).map((id) => {
       const unit = id === 'goldUae' ? 'g' : 'oz';
       return view<RowOf<typeof id>>({
@@ -259,6 +261,32 @@ export function buildViews(model: Model): View[] {
   return views;
 }
 
+/** Dues / pending expenses: what the sheet subtracts from each currency's cash. */
+function duesView(model: Model, id: 'duesInr' | 'duesAed'): View[] {
+  if (!model.tables[id]) return [];
+  const recs = model.rows[id] as RowOf<'duesInr'>[];
+  const aed = id === 'duesAed';
+  const money = (n: unknown) => (aed ? (isNum(n) ? `AED ${num(n, 0)}` : '—') : inr(n));
+  const total = sum(recs, 'amount');
+  const today = todaySerial();
+  const overdue = (r: Row) => isNum(r.dueDate) && r.dueDate < today && n0(r.amount) > 0;
+  return [view<RowOf<'duesInr'>>({
+    id, group: 'Cash', name: aed ? 'Dues · AED' : 'Dues · INR', recs,
+    total: total ? `−${money(total)}` : money(0),
+    edit: editRow(id), remove: (r) => ({ kind: 'remove', id, key: r._key }), add: { kind: 'add', id },
+    columns: [
+      { head: 'Item', name: true, render: (r) => text(r.item) },
+      { head: 'Due', render: (r) => (isNum(r.dueDate) ? fmtDate(r.dueDate) : '—'), className: (r) => (overdue(r) ? 'down' : '') },
+      { head: aed ? 'Amount (AED)' : 'Amount (INR)', num: true, render: (r) => money(r.amount), className: () => 'strong' },
+    ],
+    card: (r) => ({
+      title: text(r.item), value: money(r.amount),
+      sub: isNum(r.dueDate) ? `Due ${fmtDay(r.dueDate)}` : 'No due date',
+      right: overdue(r) ? { text: 'overdue', tone: 'down' } : undefined,
+    }),
+  })];
+}
+
 /**
  * NPS schemes, priced from the NPS Feed tab. Contributions are recorded for
  * the account as a whole, not per scheme, so gain is shown for the section.
@@ -338,5 +366,7 @@ export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent'
 
 /** A line under a group's heading, where the group needs explaining. */
 export function groupNote(model: Model, group: string): string | null {
-  return group === JEWELLERY_GROUP && model.jewellery ? 'For reference only — not counted in your net worth.' : null;
+  if (group === JEWELLERY_GROUP && model.jewellery) return 'For reference only — not counted in your net worth.';
+  if (group === 'Cash' && (model.tables.duesInr || model.tables.duesAed)) return 'Dues are deducted from the matching bank total.';
+  return null;
 }

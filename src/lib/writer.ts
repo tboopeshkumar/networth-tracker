@@ -47,7 +47,9 @@ const fmtRaw = (v: unknown) =>
 
 export type Target =
   | { kind: 'row'; id: SpecId; key: string; field: string }
-  | { kind: 'cell'; path: string[] };
+  | { kind: 'cell'; path: string[] }
+  /** a table's total row, in the given field's column */
+  | { kind: 'total'; id: SpecId; field: string };
 
 export interface ExecContext { insertAt: number | null; model: Model }
 
@@ -118,6 +120,12 @@ export async function loadAll(backend: SheetsBackend): Promise<Loaded> {
 interface Resolved { tab: string; row: number; col: number; value: Cell | undefined }
 
 function resolve(model: Model, target: Target): Resolved | null {
+  if (target.kind === 'total') {
+    const tbl = model.tables[target.id];
+    if (!tbl || tbl.totalRow === null) return null;
+    // Only ever rewritten alongside an insert, which already checks the table is as the user saw it
+    return { tab: tbl.spec.tab, row: tbl.totalRow, col: tbl.cols[target.field], value: undefined };
+  }
   if (target.kind === 'row') {
     const rec = (model.rows[target.id] as Row[]).find((r) => r._key === target.key);
     const tbl = model.tables[target.id];

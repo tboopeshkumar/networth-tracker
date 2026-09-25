@@ -1,6 +1,6 @@
 // "Worth a look": things in the sheet that are probably wrong or stale.
 
-import { fmtDate, inr, isNum, todaySerial } from './format';
+import { fmtDate, inr, isNum, n0, todaySerial } from './format';
 import { totalDrift, type Grids, type Model } from './model';
 
 export interface Check { id: string; title: string; detail: string }
@@ -42,6 +42,16 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
           + (!L.recordedFormula && canEdit ? ' Open the ledger under Holdings and use “Link to ledger” to keep them in step.' : ''),
       });
     }
+  }
+
+  // Dues past their date that still count against cash: paid (delete them) or late
+  const late = [...R.duesInr, ...R.duesAed].filter((r) => isNum(r.dueDate) && r.dueDate < todaySerial() && n0(r.amount) > 0);
+  if (late.length) {
+    out.push({
+      id: 'dues-overdue',
+      title: `${late.length} due${late.length > 1 ? 's are' : ' is'} past ${late.length > 1 ? 'their dates' : 'its date'} and still deducted from cash.`,
+      detail: `${late.map((r) => `${r.item} (${fmtDate(r.dueDate)})`).join(', ')}. If paid, delete ${late.length > 1 ? 'them' : 'it'} under Holdings → Cash.`,
+    });
   }
 
   const matured = R.fd.filter((r) => isNum(r.maturityDate) && r.maturityDate < todaySerial());

@@ -441,6 +441,56 @@ withFixture('after a delete, adding an account reuses the blank row instead of m
   assert.equal((await loadAll(demo)).model.rows.bankAed.at(-1)!.account, 'Refill');
 });
 
+withFixture('both dues tables are read, and add up to their sheet totals', async () => {
+  const f = fixture();
+  const { model } = await loadAll(new DemoSheets(f));
+  for (const id of ['duesInr', 'duesAed'] as const) {
+    const tbl = model.tables[id];
+    if (!tbl) continue;
+    assert.ok(model.rows[id].length > 0, `${id} has rows`);
+    assert.notEqual(tbl.totalRow, null, `${id} has a total row`);
+    approx(sum(model.rows[id], 'amount'), f.values[tbl.spec.tab][tbl.totalRow!][tbl.cols.amount], `${id} rows vs its total`);
+  }
+});
+
+withFixture('adding a due widens its SUM total and leaves the table beside it alone', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data } = await loadAll(demo);
+  const tbl = model.tables.duesInr;
+  if (!tbl) return;
+  const tab = tbl.spec.tab;
+  const before = structuredClone(demo.f.formulas[tab]);
+  const col = tbl.cols.amount;
+  const m = /^=SUM\(([A-Z]+)(\d+):\1(\d+)\)$/.exec(String(before[tbl.totalRow!][col]));
+  assert.ok(m, 'the total is a plain SUM range');
+
+  const plan = editorFor(model, data, { kind: 'add', id: 'duesInr' }).build({ item: 'New due', dueDate: '', amount: '500' }).plan;
+  await execute(demo, plan);
+  const after = demo.f.formulas[tab];
+  const reread = (await loadAll(demo)).model;
+  const t2 = reread.tables.duesInr!;
+  assert.equal(reread.rows.duesInr.at(-1)!.item, 'New due');
+  assert.equal(after[t2.totalRow!][col], `=SUM(${m[1]}${m[2]}:${m[1]}${t2.lastRow + 1})`, 'total now reaches the new row');
+  for (let r = 0; r < before.length; r++) {
+    for (let c = 0; c < (before[r]?.length ?? 0); c++) {
+      if (c < tbl.minCol || c > tbl.maxCol) assert.equal(after[r]?.[c] ?? '', before[r][c] ?? '', `beside it: row ${r + 1}, col ${c + 1}`);
+    }
+  }
+});
+
+withFixture('a due added after a delete fills the gap and is still inside the total', async () => {
+  const demo = new DemoSheets(fixture());
+  let { model, data } = await loadAll(demo);
+  if (!model.tables.duesAed) return;
+  await execute(demo, editorFor(model, data, { kind: 'remove', id: 'duesAed', key: model.rows.duesAed[0]._key }).build({}).plan);
+  ({ model, data } = await loadAll(demo));
+  const tbl = model.tables.duesAed!;
+  const { requests } = await execute(demo, editorFor(model, data, { kind: 'add', id: 'duesAed' }).build({ item: 'Refill', dueDate: '2026-10-01', amount: '75' }).plan);
+  assert.ok(!requests.some((r) => 'insertRange' in r || 'insertDimension' in r), 'gap reused, nothing shifted');
+  const f2 = demo.f.formulas[tbl.spec.tab][tbl.totalRow!][tbl.cols.amount];
+  assert.match(String(f2), new RegExp(`:[A-Z]+${tbl.lastRow + 2}\\)$`), 'total reaches the refilled row');
+});
+
 withFixture('edit a value, then read it back', async () => {
   const demo = new DemoSheets(fixture());
   const { model } = await loadAll(demo);
