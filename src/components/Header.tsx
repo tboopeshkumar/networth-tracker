@@ -1,5 +1,6 @@
 import { IconDots, IconRefresh } from '@tabler/icons-react';
 import { useRef } from 'react';
+import { BUILT, VERSION } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
 import { BTN } from './ui';
 
@@ -14,6 +15,9 @@ interface Props {
   onDisconnect: () => void;
   onSignOut: () => void;
 }
+
+// When this copy of the app was built, in the viewer's local time
+const builtAt = new Date(BUILT).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const MENU_ITEM = 'cursor-pointer rounded-md px-2.5 py-2 text-left text-[13px] text-ink hover:bg-sunk';
 
@@ -54,6 +58,9 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onSwitchSheet)}>Choose a different sheet</button>}
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onDisconnect)}>Revoke Google access</button>}
               <button type="button" className={MENU_ITEM} onClick={pick(onSignOut)}>Sign out</button>
+              <div className="mt-1 border-t border-line px-2.5 pb-1 pt-2 text-[11px] text-ink-3">
+                Version <span className="font-mono">{VERSION}</span> · {builtAt}
+              </div>
             </div>
           </details>
         </div>

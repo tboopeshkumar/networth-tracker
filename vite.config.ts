@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -52,10 +53,31 @@ function demoFixture(): Plugin {
   };
 }
 
+// Which build this is: the commit it was built from (CI sets GITHUB_SHA) and when.
+const VERSION = (process.env.GITHUB_SHA ?? (() => {
+  try { return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch { return 'dev'; }
+})()).trim().slice(0, 7);
+const BUILT = new Date().toISOString();
+
+// Published beside the app so an open copy can tell a newer one is live.
+function versionFile(): Plugin {
+  return {
+    name: 'version-file',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: VERSION, built: BUILT }) });
+    },
+  };
+}
+
 export default defineConfig({
   // GitHub Pages serves a project site under /<repo>/; the workflow sets this.
   base: process.env.BASE_PATH || '/',
-  plugins: [tailwindcss(), react(), contentSecurityPolicy(), demoFixture()],
+  plugins: [tailwindcss(), react(), contentSecurityPolicy(), demoFixture(), versionFile()],
+  define: {
+    __APP_VERSION__: JSON.stringify(VERSION),
+    __APP_BUILT__: JSON.stringify(BUILT),
+  },
   server: {
     // localhost only, and a fixed port: the OAuth origin is http://localhost:8080
     host: 'localhost',

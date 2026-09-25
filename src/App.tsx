@@ -6,6 +6,7 @@ import { useToast } from './components/Toast';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { CONFIG } from './config';
 import { useIdleLock } from './hooks/useIdleLock';
+import { useUpdateCheck } from './hooks/useUpdateCheck';
 import { DEMO, useSession } from './hooks/useSession';
 import type { EditRequest } from './lib/editors';
 
@@ -14,6 +15,7 @@ export function App() {
   const s = useSession(toast);
   const [editing, setEditing] = useState<EditRequest | null>(null);
   const canEdit = s.identity?.canEdit ?? false;
+  const updateReady = useUpdateCheck();
 
   useIdleLock(s.phase === 'ready' && !DEMO, CONFIG.idleMinutes, () => {
     setEditing(null);
@@ -42,6 +44,12 @@ export function App() {
         onDisconnect={s.revoke}
         onSignOut={() => { setEditing(null); s.lock('Signed out.'); }}
       />
+      {updateReady && (
+        <div role="status" className="flex items-center justify-center gap-3 border-b border-line bg-accent-soft px-4 py-1.5 text-[13px]">
+          <span>A newer version of the app is available.</span>
+          <button type="button" className="cursor-pointer rounded-md bg-accent px-2.5 py-0.5 text-xs font-semibold text-white" onClick={() => window.location.reload()}>Reload</button>
+        </div>
+      )}
       <main className="safe-main mx-auto max-w-[1180px] pt-3 sm:pt-5">
         {s.phase === 'setup' && <SetupScreen message={s.setupMessage} />}
         {s.phase === 'signin' && <SignInScreen ready={s.authReady} busy={s.busy} onSignIn={s.startSignIn} />}

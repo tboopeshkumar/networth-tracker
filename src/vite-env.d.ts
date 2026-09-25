@@ -14,3 +14,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Short commit ID of this build, and when it was built (ISO), set in vite.config.ts. */
+declare const __APP_VERSION__: string;
+declare const __APP_BUILT__: string;
