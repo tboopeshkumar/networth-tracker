@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
-import { BTN, Card, EditButton, PANEL, Pill, cx, type OnEdit } from '../ui';
+import { BTN, Card, DeleteButton, EditButton, PANEL, Pill, cx, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
 import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupNote, type View } from './holdingViews';
 
@@ -79,6 +79,13 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
 
 function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; onEdit: OnEdit }) {
   const edit = canEdit ? v.edit : undefined;
+  const remove = canEdit ? v.remove : undefined;
+  const actions = (r: Row) => (
+    <span className="inline-flex items-center">
+      {edit && <EditButton request={edit(r)} onEdit={onEdit} />}
+      {remove && <DeleteButton request={remove(r)} onEdit={onEdit} />}
+    </span>
+  );
   return (
     <>
       {v.ledger && <LedgerSummary ledger={v.ledger} canEdit={canEdit} onEdit={onEdit} />}
@@ -98,7 +105,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
               </div>
               <div className="mt-0.5 flex min-h-6 items-center justify-between gap-3 text-xs text-ink-3">
                 <span className="min-w-0">{c.sub}</span>
-                {inlineEdit && <span className="-my-1 -mr-2"><EditButton request={edit(r)} onEdit={onEdit} /></span>}
+                {inlineEdit && <span className="-my-1 -mr-2">{actions(r)}</span>}
                 {c.right && (c.right.tone
                   ? <Pill tone={c.right.tone as 'up' | 'down'}>{c.right.text}</Pill>
                   : <span className="whitespace-nowrap tabular-nums">{c.right.text}</span>)}
@@ -106,7 +113,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
               {(c.foot || (edit && !inlineEdit)) && (
                 <div className="mt-1.5 flex items-center justify-between gap-3 text-[11.5px] text-ink-3">
                   <span className="min-w-0 truncate">{c.foot}</span>
-                  {edit && <EditButton request={edit(r)} onEdit={onEdit} />}
+                  {edit && actions(r)}
                 </div>
               )}
             </div>
@@ -131,7 +138,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                     {col.render(r)}
                   </td>
                 ))}
-                {edit && <td className="act"><EditButton request={edit(r)} onEdit={onEdit} /></td>}
+                {edit && <td className="act">{actions(r)}</td>}
               </tr>
             ))}
           </tbody>

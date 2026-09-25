@@ -343,6 +343,63 @@ withFixture('NPS scheme holdings are listed, linked from Net Worth and edited by
   if (line) assert.equal(makeLinker(plain.model)(plain.model.rows.networth.find((r) => r._key === line._key)!), null);
 });
 
+withFixture('deleting a bank account moves only its own table, and nothing below it', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data } = await loadAll(demo);
+  const tab = model.tables.bankAed.spec.tab;
+  const before = structuredClone(demo.f.formulas[tab]);
+  const aed = model.rows.bankAed;
+  const victim = aed[Math.floor(aed.length / 2)];
+  const { minCol, maxCol, lastRow } = model.tables.bankAed;
+
+  const def = editorFor(model, data, { kind: 'remove', id: 'bankAed', key: victim._key });
+  assert.equal(def.danger, true);
+  await execute(demo, def.build({}).plan);
+  const after = demo.f.formulas[tab];
+
+  const cell = (g: Cell[][], r: number, c: number) => g[r]?.[c] ?? '';
+  for (let r = 0; r < before.length; r++) {
+    for (let c = 0; c < Math.max(before[r]?.length ?? 0, after[r]?.length ?? 0); c++) {
+      const inTable = c >= minCol && c <= maxCol;
+      if (!inTable || r < victim._row || r > lastRow) {
+        assert.equal(cell(after, r, c), cell(before, r, c), `untouched: row ${r + 1}, col ${c + 1}`);
+      } else if (r < lastRow) {
+        assert.equal(cell(after, r, c), cell(before, r + 1, c), `moved up: row ${r + 1}, col ${c + 1}`);
+      } else {
+        assert.equal(cell(after, r, c), '', 'a blank row left above the total');
+      }
+    }
+  }
+  const reread = (await loadAll(demo)).model.rows.bankAed;
+  assert.equal(reread.length, aed.length - 1);
+  assert.ok(!reread.some((r) => r._key === victim._key));
+});
+
+withFixture('a delete is refused when the rows below changed since loading', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data } = await loadAll(demo);
+  const rows = model.rows.bankInr;
+  const plan = editorFor(model, data, { kind: 'remove', id: 'bankInr', key: rows[0]._key }).build({}).plan;
+  const last = rows.at(-1)!;
+  const col = model.tables.bankInr.cols.account;
+  demo.f.values[model.tables.bankInr.spec.tab][last._row][col] = 'Renamed meanwhile';
+  demo.f.formulas[model.tables.bankInr.spec.tab][last._row][col] = 'Renamed meanwhile';
+  await assert.rejects(execute(demo, plan), ConflictError);
+  assert.equal((await loadAll(demo)).model.rows.bankInr.length, rows.length, 'nothing removed');
+});
+
+withFixture('a bank account can be renamed from its edit form', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data } = await loadAll(demo);
+  const rec = model.rows.bankInr[0];
+  const def = editorFor(model, data, { kind: 'row', id: 'bankInr', key: rec._key });
+  assert.deepEqual(def.fields.map((x) => x.name), ['account', 'holder', 'balance']);
+  const { plan } = def.build({ account: 'Renamed Account', holder: String(rec.holder), balance: String(rec.balance) });
+  assert.deepEqual(plan.changes.map((c) => c.after), ['Renamed Account'], 'only the changed field');
+  await execute(demo, plan);
+  assert.equal((await loadAll(demo)).model.rows.bankInr[0].account, 'Renamed Account');
+});
+
 withFixture('edit a value, then read it back', async () => {
   const demo = new DemoSheets(fixture());
   const { model } = await loadAll(demo);

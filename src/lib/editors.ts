@@ -5,7 +5,7 @@ import { fmtDate, inr, isNum, isoToSerial, num, todaySerial, type Cell } from '.
 import { isFormula, type Model, type Row, type SpecId } from './model';
 import type { SheetData } from './sheets';
 import {
-  V, planCellEdit, planInsert, planMetalPurchase, planRowEdit,
+  V, planCellEdit, planInsert, planMetalPurchase, planRemove, planRowEdit,
   type CellRefLike, type CellValue, type Edit, type Plan,
 } from './writer';
 
@@ -41,7 +41,11 @@ export type EditRequest =
   | { kind: 'row'; id: EditableRow; key: string }
   | { kind: 'cell'; path: CellPath }
   | { kind: 'add'; id: AddableId }
-  | { kind: 'link'; sheet: string };
+  | { kind: 'link'; sheet: string }
+  | { kind: 'remove'; id: RemovableRow; key: string };
+
+/** Rows the app offers to delete: plain lists with nothing hanging off them. */
+export type RemovableRow = 'bankInr' | 'bankAed';
 
 export type Values = Record<string, string>;
 
@@ -49,6 +53,8 @@ export interface EditorDef {
   title: string;
   hint?: string;
   fields: Field[];
+  /** a destructive change: the final button says so, in red */
+  danger?: boolean;
   /** Throws an Error with a user-facing message when the input isn't valid. */
   build(vals: Values): { plan: Plan; warn: string[] };
 }
@@ -145,11 +151,11 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
       break;
     case 'bankInr':
       name = `${rec.account} · ${rec.holder}`;
-      fields = [money('balance', 'Balance (₹)', rec.balance)];
+      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder', rec.holder), money('balance', 'Balance (₹)', rec.balance)];
       break;
     case 'bankAed':
       name = `${rec.account} · ${rec.holder}`;
-      fields = [money('balance', 'Balance (AED)', rec.balance, { aed: true })];
+      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder / notes', rec.holder), money('balance', 'Balance (AED)', rec.balance, { aed: true })];
       break;
   }
   const title = `Edit ${name}`;
@@ -165,6 +171,7 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
         const was = rec[f.name];
         if (!v) continue;
         if ('number' in v && isNum(was) && Math.abs(v.number - was) < 0.005) continue;
+        if ('string' in v && v.string === String(was ?? '').trim()) continue;
         edits[f.name] = { value: v, display: display(f, v), before: before(f, was), label: f.label };
         const fx = data.formulas[tbl.spec.tab]?.[rec._row]?.[tbl.cols[f.name]];
         if (isFormula(fx)) warn.push(`${f.label} is currently a formula (${fx}); this replaces it with a fixed value.`);
@@ -345,6 +352,28 @@ function addEditor(model: Model, id: AddableId): EditorDef {
   }
 }
 
+/* ---------- removing a row ---------- */
+
+function removeEditor(model: Model, id: RemovableRow, rec: Row | undefined): EditorDef {
+  const tbl = model.tables[id];
+  if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
+  const title = `Delete ${String(rec.account)} · ${String(rec.holder)}`;
+  const aed = id === 'bankAed';
+  const balance = isNum(rec.balance) && rec.balance !== 0 ? (aed ? `AED ${num(rec.balance)}` : inr(rec.balance)) : null;
+  return {
+    title,
+    danger: true,
+    hint: `Removes this account's row from ${tbl.spec.tab}. The accounts below it move up; totals and everything else on the tab stay where they are.`,
+    fields: [],
+    build() {
+      return {
+        plan: planRemove(model, id, rec, title),
+        warn: balance ? [`Its balance of ${balance} drops out of your totals and net worth.`] : [],
+      };
+    },
+  };
+}
+
 /* ---------- linking a family loan to its ledger ---------- */
 
 function linkEditor(model: Model, sheet: string): EditorDef {
@@ -373,5 +402,6 @@ export function editorFor(model: Model, data: SheetData, req: EditRequest): Edit
     case 'cell': return cellEditor(model, req.path);
     case 'add': return addEditor(model, req.id);
     case 'link': return linkEditor(model, req.sheet);
+    case 'remove': return removeEditor(model, req.id, (model.rows[req.id] as Row[]).find((r) => r._key === req.key));
   }
 }

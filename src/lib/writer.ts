@@ -66,6 +66,20 @@ export interface InsertOp {
   expectLastKey?: string;
 }
 
+/**
+ * Remove one row of a table: its cells shift up within the table's columns
+ * only (other tables side by side are untouched), then a blank row of cells
+ * is inserted above the table's end so everything below returns to where it
+ * was. Sheets re-points references on both steps, so they end up unchanged.
+ */
+export interface RemoveOp {
+  type: 'removeRow';
+  id: SpecId;
+  key: string;
+  /** keys from the removed row to the table's end, as the user saw them */
+  expectKeys: string[];
+}
+
 export interface Change {
   where: string;
   a1: string;
@@ -76,7 +90,7 @@ export interface Change {
 export interface Plan {
   title: string;
   changes: Change[];
-  ops: (SetOp | InsertOp)[];
+  ops: (SetOp | InsertOp | RemoveOp)[];
 }
 
 const shown = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : isNum(v) ? v.toLocaleString('en-IN') : String(v));
@@ -155,9 +169,21 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
       if (last?._key !== insert.expectLastKey) problems.push(`${insertTable.spec.tab}: rows were added or removed since you loaded it`);
     }
   }
+  const remove = plan.ops.find((o): o is RemoveOp => o.type === 'removeRow');
+  if (remove && plan.ops.length > 1) throw new Error('A removal must be the only change in its plan');
+  const removeAt = remove ? locateRemoval(model, remove, problems) : null;
+
   if (problems.length) throw new ConflictError('The sheet changed since you loaded it. Nothing was written.', problems);
 
   const requests: BatchRequest[] = [];
+  if (remove && removeAt) {
+    const sid = sheetId(removeAt.tab);
+    const cols = { startColumnIndex: removeAt.minCol, endColumnIndex: removeAt.maxCol + 1 };
+    requests.push({ deleteRange: { range: { sheetId: sid, startRowIndex: removeAt.row, endRowIndex: removeAt.row + 1, ...cols }, shiftDimension: 'ROWS' } });
+    requests.push({ insertRange: { range: { sheetId: sid, startRowIndex: removeAt.lastRow, endRowIndex: removeAt.lastRow + 1, ...cols }, shiftDimension: 'ROWS' } });
+    await backend.batchUpdate(requests);
+    return { requests };
+  }
   const insertAt = insertTable ? insertTable.lastRow + 1 : null;
 
   if (insert && insertTable && insertAt !== null) {
@@ -199,7 +225,37 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   return { requests };
 }
 
+/** Where a removal lands now, or why it can't: the rows from it to the table's end must be as the user saw them. */
+function locateRemoval(model: Model, op: RemoveOp, problems: string[]) {
+  const tbl = model.tables[op.id];
+  const rows = model.rows[op.id] as Row[];
+  const i = rows.findIndex((r) => r._key === op.key);
+  if (!tbl || i < 0) { problems.push('That row is no longer in the sheet'); return null; }
+  const now = rows.slice(i).map((r) => r._key);
+  if (now.join('\n') !== op.expectKeys.join('\n')) {
+    problems.push(`${tbl.spec.tab}: rows were added, removed or changed below it since you loaded it`);
+    return null;
+  }
+  return { tab: tbl.spec.tab, row: rows[i]._row, lastRow: tbl.lastRow, minCol: tbl.minCol, maxCol: tbl.maxCol };
+}
+
 /* ---------- plan builders ---------- */
+
+/** Remove a table row; the review lists each of its cells as removed. */
+export function planRemove(model: Model, id: SpecId, rec: Row, title: string): Plan {
+  const tbl = model.tables[id]!;
+  const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
+  const rows = model.rows[id] as Row[];
+  const at = rows.findIndex((r) => r._key === rec._key);
+  return {
+    title,
+    changes: Object.entries(tbl.cols)
+      .filter(([f]) => headers[f])
+      .sort((a, b) => a[1] - b[1])
+      .map(([f, c]) => ({ where: headers[f], a1: a1(tbl.spec.tab, rec._row, c), before: shown(rec[f]), after: '(removed)' })),
+    ops: [{ type: 'removeRow', id, key: rec._key, expectKeys: rows.slice(at).map((r) => r._key) }],
+  };
+}
 
 export interface Edit { value: CellValue; display: string; before?: string; label?: string }
 

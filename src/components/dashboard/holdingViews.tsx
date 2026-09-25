@@ -40,6 +40,8 @@ export interface View<R extends Row = Row> {
   card: (r: R) => CardContent;
   /** present when rows can be edited */
   edit?: (r: R) => EditRequest;
+  /** present when rows can be deleted */
+  remove?: (r: R) => EditRequest;
   ledger?: Ledger;
   /** a line above the rows, for figures that belong to the section rather than a row */
   lead?: ReactNode;
@@ -151,6 +153,7 @@ export function buildViews(model: Model): View[] {
     view<RowOf<'bankInr'>>({
       id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: cr(sum(R.bankInr, 'balance')),
       edit: editRow('bankInr'),
+      remove: (r) => ({ kind: 'remove', id: 'bankInr', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -161,6 +164,7 @@ export function buildViews(model: Model): View[] {
     view<RowOf<'bankAed'>>({
       id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: R.bankAed, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
       edit: editRow('bankAed'),
+      remove: (r) => ({ kind: 'remove', id: 'bankAed', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
         { head: 'Holder', render: (r) => text(r.holder) },

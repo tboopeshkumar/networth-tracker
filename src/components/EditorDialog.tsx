@@ -4,7 +4,7 @@ import { serialToIso, todaySerial } from '../lib/format';
 import type { Model } from '../lib/model';
 import { AccessError, AuthError, type SheetData } from '../lib/sheets';
 import { ConflictError, type Plan } from '../lib/writer';
-import { BTN, BTN_PRIMARY } from './ui';
+import { BTN, BTN_DANGER, BTN_PRIMARY } from './ui';
 
 const HINT = 'mb-3.5 text-[13px] text-ink-2';
 const ERR = 'mt-2.5 text-[13px] text-bad';
@@ -134,8 +134,8 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
         )}
         <div className={ACTIONS}>
           <button type="button" className={BTN} disabled={writing} onClick={() => setReview(null)}>Back</button>
-          <button type="button" className={BTN_PRIMARY} disabled={writing} onClick={() => void write()}>
-            {writing ? 'Writing…' : 'Write to sheet'}
+          <button type="button" className={def.danger ? BTN_DANGER : BTN_PRIMARY} disabled={writing} onClick={() => void write()}>
+            {writing ? 'Writing…' : def.danger ? 'Delete from sheet' : 'Write to sheet'}
           </button>
         </div>
       </div>
@@ -175,7 +175,7 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
       {formError && <p className={ERR} role="alert">{formError}</p>}
       <div className={ACTIONS}>
         <button type="button" className={BTN} onClick={onDone}>Cancel</button>
-        <button type="submit" className={BTN_PRIMARY}>Review changes</button>
+        <button type="submit" className={BTN_PRIMARY}>{def.danger ? 'Review deletion' : 'Review changes'}</button>
       </div>
     </form>
   );

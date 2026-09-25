@@ -1,4 +1,4 @@
-import { IconPencil } from '@tabler/icons-react';
+import { IconPencil, IconTrash } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import type { EditRequest } from '../lib/editors';
 
@@ -68,9 +68,18 @@ export function Pill({ tone, children, className, title }: { tone?: Tone; childr
 
 export const BTN = 'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink transition-colors hover:bg-sunk disabled:cursor-default disabled:opacity-50';
 export const BTN_PRIMARY = 'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-default disabled:opacity-50';
+export const BTN_DANGER = 'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-bad px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-default disabled:opacity-50';
 export const BTN_GHOST = 'inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink-3 transition-colors hover:bg-sunk hover:text-ink';
 
 export type OnEdit = (req: EditRequest) => void;
+
+export function DeleteButton({ request, onEdit }: { request: EditRequest; onEdit: OnEdit }) {
+  return (
+    <button type="button" className={cx(BTN_GHOST, 'hover:text-bad')} aria-label="Delete" title="Delete" onClick={() => onEdit(request)}>
+      <IconTrash size={14} stroke={1.75} aria-hidden="true" />
+    </button>
+  );
+}
 
 export function EditButton({ request, onEdit, children }: { request: EditRequest; onEdit: OnEdit; children?: ReactNode }) {
   return (

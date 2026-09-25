@@ -1,7 +1,7 @@
 // In-memory backend for local development and tests. Loaded only by the dev
 // build (see App.tsx), so it never ships to the live site.
 //
-// Emulates the three request types the app sends. Formulas are shifted like a
+// Emulates the request types the app sends. Formulas are shifted like a
 // Sheets copy-paste, and simple arithmetic ones (=G5-F5) are evaluated so a
 // demo write shows sensible numbers.
 
@@ -85,6 +85,26 @@ export class DemoSheets implements SheetsBackend {
   }
 
   private apply(req: BatchRequest) {
+    // Cells in a column span move up (delete) or down (insert); columns outside it stay put.
+    // Unlike Sheets, formulas elsewhere aren't re-pointed; the demo only needs the cells to move.
+    if ('deleteRange' in req || 'insertRange' in req) {
+      const del = 'deleteRange' in req;
+      const range = del ? req.deleteRange.range : req.insertRange.range;
+      const t = this.tabOf(range.sheetId);
+      const n = range.endRowIndex - range.startRowIndex;
+      for (const g of [this.f.values[t], this.f.formulas[t]]) {
+        const height = Math.max(g.length, range.endRowIndex) + (del ? 0 : n);
+        while (g.length < height) g.push([]);
+        for (let c = range.startColumnIndex; c < range.endColumnIndex; c++) {
+          const col = g.map((row) => row[c] ?? '');
+          const moved = del
+            ? [...col.slice(0, range.startRowIndex), ...col.slice(range.endRowIndex), ...Array(n).fill('')]
+            : [...col.slice(0, range.startRowIndex), ...Array(n).fill(''), ...col.slice(range.startRowIndex, height - n)];
+          g.forEach((row, r) => { while (row.length <= c) row.push(''); row[c] = moved[r]; });
+        }
+      }
+      return;
+    }
     if ('insertDimension' in req) {
       const { sheetId, startIndex: at } = req.insertDimension.range;
       const t = this.tabOf(sheetId);
