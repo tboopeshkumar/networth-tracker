@@ -42,6 +42,8 @@ export interface View<R extends Row = Row> {
   edit?: (r: R) => EditRequest;
   /** present when rows can be deleted */
   remove?: (r: R) => EditRequest;
+  /** present when rows can be added: the header's + button */
+  add?: EditRequest;
   ledger?: Ledger;
   /** a line above the rows, for figures that belong to the section rather than a row */
   lead?: ReactNode;
@@ -72,6 +74,7 @@ export function buildViews(model: Model): View[] {
       // The oldest NAV in the list: the date the whole total is only as fresh as
       note: oldest(R.mf.map((r) => r.navDate)),
       edit: editRow('mf'),
+      add: { kind: 'add', id: 'mf' },
       columns: [
         { head: 'Fund', name: true, render: (r) => <>{text(r.fund)}<div className="sub2">{text(r.platform)}</div></> },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -132,6 +135,7 @@ export function buildViews(model: Model): View[] {
     view<RowOf<'fd'>>({
       id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, total: cr(sum(R.fd, 'amount')),
       edit: editRow('fd'),
+      add: { kind: 'add', id: 'fd' },
       columns: [
         { head: 'Institution', name: true, render: (r) => <>{text(r.institution)}<div className="sub2">{r.ref ? String(r.ref) : ''}</div></> },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -153,6 +157,7 @@ export function buildViews(model: Model): View[] {
     view<RowOf<'bankInr'>>({
       id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: cr(sum(R.bankInr, 'balance')),
       edit: editRow('bankInr'),
+      add: { kind: 'add', id: 'bankInr' },
       remove: (r) => ({ kind: 'remove', id: 'bankInr', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
@@ -164,6 +169,7 @@ export function buildViews(model: Model): View[] {
     view<RowOf<'bankAed'>>({
       id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: R.bankAed, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
       edit: editRow('bankAed'),
+      add: { kind: 'add', id: 'bankAed' },
       remove: (r) => ({ kind: 'remove', id: 'bankAed', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
@@ -175,7 +181,7 @@ export function buildViews(model: Model): View[] {
     ...(['goldUae', 'silverUae'] as const).map((id) => {
       const unit = id === 'goldUae' ? 'g' : 'oz';
       return view<RowOf<typeof id>>({
-        id, group: 'Metals · UAE', name: id === 'goldUae' ? 'Gold (UAE)' : 'Silver (UAE)',
+        id, group: 'Metals · UAE', name: id === 'goldUae' ? 'Gold (UAE)' : 'Silver (UAE)', add: { kind: 'add', id },
         recs: R[id], total: `${num(sum(R[id], 'qty'))} ${unit}`,
         columns: [
           { head: 'Bought', render: (r) => fmtDate(r.date) },

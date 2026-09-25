@@ -400,6 +400,47 @@ withFixture('a bank account can be renamed from its edit form', async () => {
   assert.equal((await loadAll(demo)).model.rows.bankInr[0].account, 'Renamed Account');
 });
 
+withFixture('adding a bank account pushes down only its own table', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data } = await loadAll(demo);
+  const tab = model.tables.bankInr.spec.tab;
+  const before = structuredClone(demo.f.formulas[tab]);
+  const { minCol, maxCol, lastRow } = model.tables.bankInr;
+
+  const def = editorFor(model, data, { kind: 'add', id: 'bankInr' });
+  await execute(demo, def.build({ account: 'New Bank', holder: 'Someone', balance: '1234' }).plan);
+  const after = demo.f.formulas[tab];
+
+  const cell = (g: Cell[][], r: number, c: number) => g[r]?.[c] ?? '';
+  const blankBelow = [minCol, minCol + 1, maxCol].every((c) => cell(before, lastRow + 1, c) === '');
+  for (let r = 0; r < before.length; r++) {
+    for (let c = 0; c < (before[r]?.length ?? 0); c++) {
+      if (c < minCol || c > maxCol || r <= lastRow) assert.equal(cell(after, r, c), cell(before, r, c), `untouched: row ${r + 1}, col ${c + 1}`);
+      else if (!blankBelow && r > lastRow + 1) assert.equal(cell(after, r, c), cell(before, r - 1, c), `pushed down: row ${r + 1}, col ${c + 1}`);
+    }
+  }
+  const rows = (await loadAll(demo)).model.rows.bankInr;
+  assert.equal(rows.length, model.rows.bankInr.length + 1);
+  assert.deepEqual([rows.at(-1)!.account, rows.at(-1)!.holder, rows.at(-1)!.balance], ['New Bank', 'Someone', 1234]);
+});
+
+withFixture('after a delete, adding an account reuses the blank row instead of moving anything', async () => {
+  const demo = new DemoSheets(fixture());
+  let { model, data } = await loadAll(demo);
+  await execute(demo, editorFor(model, data, { kind: 'remove', id: 'bankAed', key: model.rows.bankAed[0]._key }).build({}).plan);
+  ({ model, data } = await loadAll(demo));
+  const tab = model.tables.bankAed.spec.tab;
+  const before = structuredClone(demo.f.formulas[tab]);
+
+  const plan = editorFor(model, data, { kind: 'add', id: 'bankAed' }).build({ account: 'Refill', holder: 'X', balance: '10' }).plan;
+  const { requests } = await execute(demo, plan);
+  assert.ok(!requests.some((r) => 'insertRange' in r || 'insertDimension' in r), 'nothing shifted');
+  const after = demo.f.formulas[tab];
+  const row = model.tables.bankAed.lastRow + 1;
+  for (let r = 0; r < before.length; r++) if (r !== row) assert.deepEqual(after[r], before[r], `row ${r + 1} unchanged`);
+  assert.equal((await loadAll(demo)).model.rows.bankAed.at(-1)!.account, 'Refill');
+});
+
 withFixture('edit a value, then read it back', async () => {
   const demo = new DemoSheets(fixture());
   const { model } = await loadAll(demo);

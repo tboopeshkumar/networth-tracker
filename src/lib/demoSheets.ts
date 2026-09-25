@@ -120,8 +120,15 @@ export class DemoSheets implements SheetsBackend {
       const src = source.startRowIndex;
       const dst = destination.startRowIndex;
       const fg = this.f.formulas[t];
-      fg[dst] = (fg[src] ?? []).map((v) => (isFormula(v) ? shiftRows(v, dst - src) : v));
-      this.f.values[t][dst] = fg[dst].map((v) => (isFormula(v) ? '' : v));
+      const vg = this.f.values[t];
+      for (const g of [fg, vg]) { while (g.length <= dst) g.push([]); }
+      // Only the columns in the range, as Sheets does
+      for (let c = source.startColumnIndex; c < source.endColumnIndex; c++) {
+        const v = fg[src]?.[c] ?? '';
+        for (const row of [fg[dst], vg[dst]]) { while (row.length <= c) row.push(''); }
+        fg[dst][c] = isFormula(v) ? shiftRows(v, dst - src) : v;
+        vg[dst][c] = isFormula(v) ? '' : v;
+      }
       return;
     }
     const { start, rows } = req.updateCells;

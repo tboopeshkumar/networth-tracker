@@ -185,16 +185,29 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
     return { requests };
   }
   const insertAt = insertTable ? insertTable.lastRow + 1 : null;
+  // Which cells move down when the row goes in: whole row, only this table's columns, or none
+  let shifted: { from: number; to: number } | null = null;
 
   if (insert && insertTable && insertAt !== null) {
     const tab = insertTable.spec.tab;
     const sid = sheetId(tab);
     const above = insertAt - 1;
     const prevF = data.formulas[tab][above] ?? [];
-    const width = Math.max(prevF.length, insertTable.maxCol + 1);
-    const span = { sheetId: sid, startColumnIndex: 0, endColumnIndex: width };
+    const scoped = !!insertTable.spec.sideBySide;
+    const from = scoped ? insertTable.minCol : 0;
+    const width = scoped ? insertTable.maxCol + 1 : Math.max(prevF.length, insertTable.maxCol + 1);
+    const span = { sheetId: sid, startColumnIndex: from, endColumnIndex: width };
+    const nextF = data.formulas[tab][insertAt] ?? [];
+    // A blank row just below the table (left by a delete) is reused rather than pushing everything down
+    const reuse = scoped && insertAt !== insertTable.totalRow
+      && Array.from({ length: width - from }, (_, i) => nextF[from + i]).every((v) => v === '' || v === undefined);
 
-    requests.push({ insertDimension: { range: { sheetId: sid, dimension: 'ROWS', startIndex: insertAt, endIndex: insertAt + 1 }, inheritFromBefore: true } });
+    if (scoped && !reuse) {
+      requests.push({ insertRange: { range: { ...span, startRowIndex: insertAt, endRowIndex: insertAt + 1 }, shiftDimension: 'ROWS' } });
+    } else if (!scoped) {
+      requests.push({ insertDimension: { range: { sheetId: sid, dimension: 'ROWS', startIndex: insertAt, endIndex: insertAt + 1 }, inheritFromBefore: true } });
+    }
+    if (!reuse) shifted = { from, to: width };
     requests.push({
       copyPaste: {
         source: { ...span, startRowIndex: above, endRowIndex: above + 1 },
@@ -204,7 +217,7 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
     });
 
     const fieldAt = Object.fromEntries(Object.entries(insertTable.cols).map(([f, c]) => [c, f]));
-    for (let c = 0; c < width; c++) {
+    for (let c = from; c < width; c++) {
       const field = fieldAt[c];
       const prev = prevF[c];
       let v: CellValue | null = null;
@@ -216,9 +229,10 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   }
 
   for (const s of sets) {
-    const shifted = insertAt !== null && s.at.tab === insertTable?.spec.tab && s.at.row >= insertAt;
+    const moved = !!shifted && insertAt !== null && s.at.tab === insertTable?.spec.tab && s.at.row >= insertAt
+      && s.at.col >= shifted.from && s.at.col < shifted.to;
     const value = typeof s.value === 'function' ? s.value({ insertAt, model }) : s.value;
-    requests.push(cellReq(sheetId(s.at.tab), shifted ? s.at.row + 1 : s.at.row, s.at.col, value));
+    requests.push(cellReq(sheetId(s.at.tab), moved ? s.at.row + 1 : s.at.row, s.at.col, value));
   }
 
   await backend.batchUpdate(requests);

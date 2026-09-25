@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
-import { BTN, Card, DeleteButton, EditButton, PANEL, Pill, cx, type OnEdit } from '../ui';
+import { Card, DeleteButton, EditButton, PANEL, Pill, cx, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
 import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupNote, type View } from './holdingViews';
 
@@ -17,8 +17,6 @@ interface Props {
   sectionRef: (id: ViewId, el: HTMLDetailsElement | null) => void;
 }
 
-const PLUS = <IconPlus size={14} stroke={2} aria-hidden="true" />;
-
 /** Grouped, collapsible sections; closed headers still show count and total. */
 export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectionRef }: Props) {
   const views = useMemo(() => buildViews(model), [model]);
@@ -26,19 +24,10 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
     .map((g) => [g, views.filter((v) => v.group === g)] as const)
     .filter(([, vs]) => vs.length);
 
-  const addButtons = canEdit
-    ? (
-      <div className="flex flex-wrap gap-1.5">
-        <button type="button" className={BTN} onClick={() => onEdit({ kind: 'add', id: 'mf' })}>{PLUS}Fund</button>
-        <button type="button" className={BTN} onClick={() => onEdit({ kind: 'add', id: 'fd' })}>{PLUS}FD</button>
-        <button type="button" className={BTN} onClick={() => onEdit({ kind: 'add', id: 'goldUae' })}>{PLUS}Gold</button>
-        <button type="button" className={BTN} onClick={() => onEdit({ kind: 'add', id: 'silverUae' })}>{PLUS}Silver</button>
-      </div>
-    )
-    : <Pill>View only</Pill>;
+  const viewOnly = canEdit ? undefined : <Pill>View only</Pill>;
 
   return (
-    <Card title="Holdings" sub={canEdit ? 'Edits are written straight to your sheet, after you review them' : 'Read-only view'} action={addButtons}>
+    <Card title="Holdings" sub={canEdit ? 'Edits are written straight to your sheet, after you review them' : 'Read-only view'} action={viewOnly}>
       <div className="space-y-5">
         {groups.map(([label, vs]) => (
           <div key={label}>
@@ -58,8 +47,21 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                     <IconChevronRight size={16} stroke={2} className="flex-none text-ink-3 transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
                     <span className="min-w-0 shrink-0 truncate font-medium">{v.name}</span>
                     {v.note && <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{v.note}</span>}
-                    <span className={cx('rounded-full bg-sunk px-2 text-[11px] leading-[18px] text-ink-3 tabular-nums', !v.note && 'ml-auto')}>{v.recs.length}</span>
+                    {/* On phones a dated header needs the room more than the count does */}
+                    <span className={cx('rounded-full bg-sunk px-2 text-[11px] leading-[18px] text-ink-3 tabular-nums', !v.note && 'ml-auto', v.note && 'hidden sm:inline')}>{v.recs.length}</span>
                     <span className="whitespace-nowrap font-semibold tabular-nums">{v.total}</span>
+                    {canEdit && v.add && (
+                      <button
+                        type="button"
+                        className="-my-1 -mr-1.5 grid size-7 flex-none cursor-pointer place-items-center rounded-md text-ink-3 transition-colors hover:bg-sunk hover:text-accent"
+                        aria-label={`Add to ${v.name}`}
+                        title={`Add to ${v.name}`}
+                        // Inside <summary>: don't also open or close the section
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(v.add!); }}
+                      >
+                        <IconPlus size={16} stroke={2} aria-hidden="true" />
+                      </button>
+                    )}
                   </summary>
                   {/* Render the body only when open: long ledgers stay cheap */}
                   {open.has(v.id) && (

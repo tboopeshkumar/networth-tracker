@@ -32,6 +32,8 @@ export interface Spec<F extends string = string> {
   optionalHeaders?: Record<string, string>;
   /** a sheet without this section still loads */
   optional?: boolean;
+  /** shares its rows with another table beside it: row inserts stay within its own columns */
+  sideBySide?: boolean;
 }
 
 // Field names are inferred from `headers` only; anchor and key must be among them.
@@ -84,10 +86,12 @@ export const SPECS = {
     },
   }),
   bankInr: spec({
+    sideBySide: true,
     tab: 'Bank Balances', anchor: 'balance', key: ['account', 'holder'], end: /total/i,
     headers: { account: 'Account', holder: 'Holder', balance: 'Balance (INR)' },
   }),
   bankAed: spec({
+    sideBySide: true,
     tab: 'Bank Balances', anchor: 'balance', key: ['account', 'holder'], end: /total/i,
     headers: { account: 'Account', holder: 'Holder/Notes', balance: 'Balance (AED)' },
   }),

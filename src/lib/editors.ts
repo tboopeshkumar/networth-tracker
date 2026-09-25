@@ -32,7 +32,7 @@ export interface Field {
 }
 
 export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps';
-export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend';
+export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed';
 export type CellPath =
   | 'cells.fxAedInr' | 'cells.fxUsdAed' | 'cells.npsInvested' | 'cells.npsGain'
   | 'summaries.goldUae.currentAed' | 'summaries.silverUae.sellPrice';
@@ -309,6 +309,16 @@ function addEditor(model: Model, id: AddableId): EditorDef {
         money('current', 'Current value (₹)', '', { required: true }),
         date('navDate', 'Valued on', today),
       ]);
+    case 'bankInr':
+    case 'bankAed': {
+      const aed = id === 'bankAed';
+      const rows = model.rows[id];
+      return simple(id, aed ? 'Add AED bank account' : 'Add INR bank account', [
+        text('account', 'Account', '', { required: true }),
+        text('holder', aed ? 'Holder / notes' : 'Holder', '', { list: uniq(rows.map((r) => r.holder)) }),
+        money('balance', aed ? 'Balance (AED)' : 'Balance (₹)', '', { required: true, aed }),
+      ], 'Added at the end of the list, in this table only; the table beside it and everything below stay where they are.');
+    }
     case 'fd':
       return simple('fd', 'Add fixed deposit', [
         date('date', 'Invested on', today, { required: true }),
