@@ -16,7 +16,12 @@ export function RatesInputs({ model, canEdit, onEdit }: { model: Model; canEdit:
     return daily ? { note: `Daily · ${fmtDate(daily.rateDate)}`, live: true } : formula ? { note: live, live: true } : { note: 'Typed in' };
   };
   if (C.fxAedInr) tiles.push({ label: 'AED → INR', value: num(C.fxAedInr.value, 4), ...fx(C.fxAedInr.formula, 'Live rate'), path: 'cells.fxAedInr' });
-  if (C.fxUsdAed) tiles.push({ label: 'USD → AED', value: num(C.fxUsdAed.value, 4), note: C.fxUsdAed.formula ? 'Formula' : 'Typed in', path: 'cells.fxUsdAed' });
+  // The dirham is pegged to the dollar, so a live quote sits at 3.6725: say both, or it looks typed
+  if (C.fxUsdAed) {
+    const f = C.fxUsdAed.formula;
+    const src = /GOOGLEFINANCE/i.test(f ?? '') ? { note: 'Live · pegged at 3.6725', live: true } : f ? { note: 'Formula' } : { note: 'Typed in' };
+    tiles.push({ label: 'USD → AED', value: num(C.fxUsdAed.value, 4), ...src, path: 'cells.fxUsdAed' });
+  }
   if (C.npsInvested) tiles.push({ label: 'NPS contributions', value: inr(C.npsInvested.value), note: `As of ${fmtDate(C.npsAsOf?.value)}`, path: 'cells.npsInvested' });
   // Priced from scheme NAVs, the gain is a formula: show where it comes from, and don't offer to overwrite it
   if (C.npsGain) {
