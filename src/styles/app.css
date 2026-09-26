@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
-/* Palette: categorical slots 1-7 validated for CVD separation in both modes
-   (dataviz validator, adjacent pairs). Light-mode slots 3-5 sit under 3:1 on
-   the surface, so every bar carries a direct text label.
+/* Palette: categorical slots 1-7, the "Vivid" set chosen for this app.
+   Slot = asset class (see CATEGORY_SLOT / GROUP_SLOT in ui.tsx):
+   1 Liquid (blue), 2 Equity (orange), 3 Fixed income (green), 4 Gold (yellow),
+   5 Mutual funds (cyan), 6 Real estate (violet), 7 Silver / money lent (fuchsia).
+   Brighter than the earlier validated set, so every bar and slice also carries
+   a text label; don't rely on colour alone. Dark mode uses lighter shades.
 
    Components use Tailwind utilities named after these tokens (bg-surface,
    text-ink-3, border-line, bg-good-soft ...), so light and dark mode are
@@ -23,8 +26,8 @@
   --warn: #fab219;
   --accent: #2a78d6;
   --s0: #898781;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
-  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7;
+  --s1: #2563eb; --s2: #f97316; --s3: #16a34a; --s4: #eab308;
+  --s5: #0891b2; --s6: #7c3aed; --s7: #c026d3;
   --good-soft: color-mix(in srgb, var(--good) 11%, var(--surface));
   --bad-soft: color-mix(in srgb, var(--bad) 10%, var(--surface));
   --warn-soft: color-mix(in srgb, var(--warn) 14%, var(--surface));
@@ -49,8 +52,8 @@
     --good: #3dbb3d;
     --bad: #ef6b6b;
     --accent: #4b93ec;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-    --s5: #d55181; --s6: #008300; --s7: #9085e9;
+    --s1: #3b82f6; --s2: #fb923c; --s3: #22c55e; --s4: #facc15;
+    --s5: #22d3ee; --s6: #a78bfa; --s7: #e879f9;
     --good-soft: color-mix(in srgb, var(--good) 16%, var(--surface));
     --bad-soft: color-mix(in srgb, var(--bad) 15%, var(--surface));
     --warn-soft: color-mix(in srgb, var(--warn) 12%, var(--surface));
