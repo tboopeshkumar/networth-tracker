@@ -15,27 +15,39 @@ interface Props {
   onToggle: (id: ViewId, open: boolean) => void;
   flash: ViewId | null;
   sectionRef: (id: ViewId, el: HTMLDetailsElement | null) => void;
+  /** show just this group, as its own card titled with its name */
+  only?: string;
+  /** groups to leave out (shown in a card of their own elsewhere) */
+  except?: string[];
 }
 
 /** Grouped, collapsible sections; closed headers still show count and total. */
-export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectionRef }: Props) {
+export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectionRef, only, except = [] }: Props) {
   const views = useMemo(() => buildViews(model), [model]);
   const groups = GROUP_ORDER
+    .filter((g) => (only ? g === only : !except.includes(g)))
     .map((g) => [g, views.filter((v) => v.group === g)] as const)
     .filter(([, vs]) => vs.length);
+  if (!groups.length) return null;
 
   const viewOnly = canEdit ? undefined : <Pill>View only</Pill>;
+  const title = only
+    ? <span className="inline-flex items-center gap-2"><span className="inline-block size-2.5 rounded-full" style={{ background: slotColor(GROUP_SLOT[only] ?? 5) }} />{only}</span>
+    : 'Holdings';
+  const sub = only
+    ? groupNote(model, only) ?? undefined
+    : canEdit ? 'Edits are written straight to your sheet, after you review them' : 'Read-only view';
 
   return (
-    <Card title="Holdings" sub={canEdit ? 'Edits are written straight to your sheet, after you review them' : 'Read-only view'} action={viewOnly}>
+    <Card title={title} sub={sub} action={viewOnly}>
       <div className="space-y-5">
         {groups.map(([label, vs]) => (
           <div key={label}>
             {/* The group's colour marks its label and the edge of each of its sections */}
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={tint(GROUP_SLOT[label] ?? 5)}>
+            {!only && <div className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={tint(GROUP_SLOT[label] ?? 5)}>
               <span className="inline-block size-1.5 rounded-full" style={{ background: slotColor(GROUP_SLOT[label] ?? 5) }} />{label}
-            </div>
-            {groupNote(model, label) && <p className="-mt-1 mb-2 px-0.5 text-xs text-ink-2">{groupNote(model, label)}</p>}
+            </div>}
+            {!only && groupNote(model, label) && <p className="-mt-1 mb-2 px-0.5 text-xs text-ink-2">{groupNote(model, label)}</p>}
             {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
             <div className="space-y-1.5">
               {vs.map((v) => (

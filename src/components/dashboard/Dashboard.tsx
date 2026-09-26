@@ -60,8 +60,11 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
   return (
     <>
       <Summary model={model} />
+      {/* Cash first: the balances checked most often, straight after the summary */}
+      <Holdings model={model} canEdit={canEdit} onEdit={onEdit} only="Cash"
+        open={open} onToggle={toggle} flash={flash} sectionRef={sectionRef} />
       <Positions model={model} linkOf={linkOf} onDrill={drill} />
-      <Holdings model={model} canEdit={canEdit} onEdit={onEdit}
+      <Holdings model={model} canEdit={canEdit} onEdit={onEdit} except={['Cash']}
         open={open} onToggle={toggle} flash={flash} sectionRef={sectionRef} />
       <RatesInputs model={model} canEdit={canEdit} onEdit={onEdit} />
       <Checks model={model} values={data.values} canEdit={canEdit} />
