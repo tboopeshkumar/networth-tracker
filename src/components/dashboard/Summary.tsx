@@ -2,18 +2,43 @@ import { IconArrowDownRight, IconArrowUpRight, IconCash, IconChartLine, IconMapP
 import type { ReactNode } from 'react';
 import { fmtDate, fmtMonth, isNum, n0, pct, ret, signedPct, tone } from '../../lib/format';
 import type { Model } from '../../lib/model';
-import { Amount, CARD, Label, Pill, cx } from '../ui';
+import { Amount, CARD, CATEGORY_SLOT, Label, Pill, cx, slotColor, tint, tintInk } from '../ui';
 
 const ICON = { size: 15, stroke: 1.75, 'aria-hidden': true } as const;
 
 /** One composition figure: amount and its share of the total. */
-function ShareTile({ label, icon, value, share }: { label: string; icon: ReactNode; value: number; share: number }) {
+function ShareTile({ label, icon, value, share, slot }: { label: string; icon: ReactNode; value: number; share: number; slot: number }) {
   return (
-    <div className={cx(CARD, 'min-w-0 p-3.5 sm:p-4')}>
+    <div className="min-w-0 rounded-2xl border border-line p-3.5 shadow-card sm:p-4" style={tint(slot)}>
       {/* two lines reserved on phones, so the three values line up */}
-      <Label icon={icon} className="min-h-[2lh] items-start sm:min-h-0 sm:items-center">{label}</Label>
-      <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums sm:text-[22px]"><Amount value={value} /></div>
-      <div className="text-xs text-ink-3 tabular-nums">{pct(share)}<span className="hidden sm:inline"> of total</span></div>
+      <Label icon={icon} className="min-h-[2lh] items-start !text-current opacity-85 sm:min-h-0 sm:items-center">{label}</Label>
+      <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums text-ink sm:text-[22px]"><Amount value={value} /></div>
+      <div className="text-xs tabular-nums opacity-85">{pct(share)}<span className="hidden sm:inline"> of total</span></div>
+    </div>
+  );
+}
+
+/** A thin bar of the whole portfolio by asset class, in the category colours. */
+function MixBar({ rows, total }: { rows: Model['rows']['networth']; total: number }) {
+  const by: Record<string, number> = {};
+  for (const r of rows) by[String(r.category || '—')] = (by[String(r.category || '—')] ?? 0) + n0(r.current);
+  const parts = Object.entries(by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (!total || !parts.length) return null;
+  return (
+    <div className="mt-3">
+      <div className="flex h-2 overflow-hidden rounded-full bg-sunk" role="img" aria-label={parts.map(([k, v]) => `${k} ${pct(v / total)}`).join(', ')}>
+        {parts.map(([k, v]) => (
+          <span key={k} title={`${k} · ${pct(v / total)}`} style={{ width: `${(v / total) * 100}%`, background: slotColor(CATEGORY_SLOT[k] ?? 0) }} />
+        ))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+        {parts.slice(0, 5).map(([k, v]) => (
+          <span key={k} className="flex items-center gap-1" style={{ color: tintInk(CATEGORY_SLOT[k] ?? 0) }}>
+            <span className="inline-block size-1.5 rounded-full" style={{ background: slotColor(CATEGORY_SLOT[k] ?? 0) }} />
+            {k} <span className="tabular-nums opacity-80">{pct(v / total)}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -68,12 +93,13 @@ export function Summary({ model }: { model: Model }) {
             </Pill>
           )}
         </div>
+        <MixBar rows={nw} total={T.current} />
       </section>
 
       <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-3">
-        <ShareTile label="Liquid cash" icon={<IconCash {...ICON} />} value={liquid} share={share(liquid)} />
-        <ShareTile label="Equity exposure" icon={<IconChartLine {...ICON} />} value={equity} share={share(equity)} />
-        <ShareTile label="Held in UAE" icon={<IconMapPin {...ICON} />} value={uae} share={share(uae)} />
+        <ShareTile label="Liquid cash" icon={<IconCash {...ICON} />} value={liquid} share={share(liquid)} slot={CATEGORY_SLOT.Liquid} />
+        <ShareTile label="Equity exposure" icon={<IconChartLine {...ICON} />} value={equity} share={share(equity)} slot={CATEGORY_SLOT.Equity} />
+        <ShareTile label="Held in UAE" icon={<IconMapPin {...ICON} />} value={uae} share={share(uae)} slot={CATEGORY_SLOT.FI} />
       </div>
     </>
   );

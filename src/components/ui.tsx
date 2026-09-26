@@ -10,6 +10,22 @@ export const CATEGORY_SLOT: Record<string, number> = {
 
 export const slotColor = (slot: number | undefined) => `var(--s${slot ?? 0})`;
 
+/**
+ * A surface washed with a category colour, and text in a deeper (light mode)
+ * or brighter (dark mode) shade of it, so each asset class reads the same
+ * colour everywhere. Mixing toward ink keeps the text legible on both themes.
+ */
+export const tint = (slot: number) => ({
+  background: `color-mix(in srgb, var(--s${slot}) var(--tint), var(--surface))`,
+  color: `color-mix(in srgb, var(--s${slot}) 62%, var(--ink-1))`,
+});
+export const tintInk = (slot: number) => `color-mix(in srgb, var(--s${slot}) 62%, var(--ink-1))`;
+
+/** Each holdings group takes the colour of the asset class it mostly is. */
+export const GROUP_SLOT: Record<string, number> = {
+  Investments: 2, Cash: 1, 'Metals · UAE': 4, 'Money lent': 7,
+};
+
 export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
 
 export function Swatch({ slot }: { slot: number | undefined }) {

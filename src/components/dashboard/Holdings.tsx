@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
-import { Card, DeleteButton, EditButton, PANEL, Pill, cx, type OnEdit } from '../ui';
+import { Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
 import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupNote, type View } from './holdingViews';
 
@@ -31,7 +31,10 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
       <div className="space-y-5">
         {groups.map(([label, vs]) => (
           <div key={label}>
-            <div className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-3">{label}</div>
+            {/* The group's colour marks its label and the edge of each of its sections */}
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={tint(GROUP_SLOT[label] ?? 5)}>
+              <span className="inline-block size-1.5 rounded-full" style={{ background: slotColor(GROUP_SLOT[label] ?? 5) }} />{label}
+            </div>
             {groupNote(model, label) && <p className="-mt-1 mb-2 px-0.5 text-xs text-ink-2">{groupNote(model, label)}</p>}
             {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
             <div className="space-y-1.5">
@@ -39,7 +42,8 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                 <details
                   key={v.id}
                   ref={(el) => sectionRef(v.id, el)}
-                  className={cx('group scroll-mt-20 rounded-xl border border-line bg-surface', flash === v.id && 'flash')}
+                  className={cx('group scroll-mt-20 rounded-xl border border-l-[3px] border-line bg-surface', flash === v.id && 'flash')}
+                  style={{ borderLeftColor: slotColor(GROUP_SLOT[label] ?? 5) }}
                   open={open.has(v.id)}
                   onToggle={(e) => onToggle(v.id, e.currentTarget.open)}
                 >
