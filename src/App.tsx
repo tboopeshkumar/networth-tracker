@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { EditorDialog } from './components/EditorDialog';
+import { ExportDialog } from './components/export/ExportDialog';
 import { Header } from './components/Header';
 import { LoadingScreen, PickScreen, SetupScreen, SignInScreen } from './components/Screens';
 import { useToast } from './components/Toast';
@@ -14,6 +15,7 @@ export function App() {
   const toast = useToast();
   const s = useSession(toast);
   const [editing, setEditing] = useState<EditRequest | null>(null);
+  const [exporting, setExporting] = useState(false);
   const canEdit = s.identity?.canEdit ?? false;
   const updateReady = useUpdateCheck();
 
@@ -43,6 +45,7 @@ export function App() {
         onSwitchSheet={s.switchSheet}
         onDisconnect={s.revoke}
         onSignOut={() => { setEditing(null); s.lock('Signed out.'); }}
+        onExport={() => setExporting(true)}
       />
       {updateReady && (
         <div role="status" className="flex items-center justify-center gap-3 border-b border-line bg-accent-soft px-4 py-1.5 text-[13px]">
@@ -57,6 +60,14 @@ export function App() {
         {(s.phase === 'loading' || s.phase === 'booting') && <LoadingScreen />}
         {session && <Dashboard loaded={session.loaded} canEdit={canEdit} onEdit={onEdit} />}
       </main>
+      {exporting && session && (
+        <ExportDialog
+          model={session.loaded.model}
+          values={session.loaded.data.values}
+          sheetTitle={session.backend.title}
+          onClose={() => setExporting(false)}
+        />
+      )}
       {editing && session && (
         <EditorDialog
           request={editing}

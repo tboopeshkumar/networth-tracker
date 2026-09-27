@@ -14,6 +14,7 @@ interface Props {
   onSwitchSheet: () => void;
   onDisconnect: () => void;
   onSignOut: () => void;
+  onExport: () => void;
 }
 
 // When this copy of the app was built, in the viewer's local time
@@ -21,7 +22,7 @@ const builtAt = new Date(BUILT).toLocaleString('en-IN', { day: 'numeric', month:
 
 const MENU_ITEM = 'cursor-pointer rounded-md px-2.5 py-2 text-left text-[13px] text-ink hover:bg-sunk';
 
-export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefresh, onSwitchSheet, onDisconnect, onSignOut }: Props) {
+export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefresh, onSwitchSheet, onDisconnect, onSignOut, onExport }: Props) {
   const menu = useRef<HTMLDetailsElement>(null);
   const pick = (fn: () => void) => () => {
     if (menu.current) menu.current.open = false;
@@ -55,6 +56,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
                 Signed in as
                 <b className="block break-all font-medium text-ink">{canEdit ? account : `${account} (view only)`}</b>
               </div>
+              <button type="button" className={MENU_ITEM} onClick={pick(onExport)}>Export to PDF…</button>
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onSwitchSheet)}>Choose a different sheet</button>}
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onDisconnect)}>Revoke Google access</button>}
               <button type="button" className={MENU_ITEM} onClick={pick(onSignOut)}>Sign out</button>
