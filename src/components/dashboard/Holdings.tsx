@@ -49,17 +49,19 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
             </div>}
             {!only && groupNote(model, label) && <p className="-mt-1 mb-2 px-0.5 text-xs text-ink-2">{groupNote(model, label)}</p>}
             {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
-            <div className="space-y-1.5">
+            {/* Sections run edge to edge of the card, like All positions: rows split by
+                hairlines, the group's colour as a stripe at the left edge */}
+            <div className="-mx-4 border-y border-line sm:-mx-5">
               {vs.map((v) => (
                 <details
                   key={v.id}
                   ref={(el) => sectionRef(v.id, el)}
-                  className={cx('group scroll-mt-20 rounded-xl border border-l-[3px] border-line bg-surface', flash === v.id && 'flash')}
+                  className={cx('group scroll-mt-20 border-l-[3px] bg-surface [&+&]:border-t [&+&]:border-t-line', flash === v.id && 'flash')}
                   style={{ borderLeftColor: slotColor(GROUP_SLOT[label] ?? 5) }}
                   open={open.has(v.id)}
                   onToggle={(e) => onToggle(v.id, e.currentTarget.open)}
                 >
-                  <summary className="flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-sunk group-open:rounded-b-none group-open:border-b group-open:border-grid">
+                  <summary className="flex cursor-pointer select-none items-center gap-2.5 py-3 pl-[13px] pr-4 transition-colors hover:bg-sunk group-open:border-b group-open:border-grid sm:pl-[17px] sm:pr-5">
                     <IconChevronRight size={16} stroke={2} className="flex-none text-ink-3 transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
                     <span className="min-w-0 shrink-0 truncate font-medium">{v.name}</span>
                     {v.note && <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{v.note}</span>}
@@ -81,7 +83,7 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                   </summary>
                   {/* Render the body only when open: long ledgers stay cheap */}
                   {open.has(v.id) && (
-                    <div className="px-3 pb-2.5 pt-2">
+                    <div className="bg-sunk/40 pb-2.5 pl-[13px] pr-4 pt-2 sm:pl-[17px] sm:pr-5">
                       <Section view={v} canEdit={canEdit} onEdit={onEdit} />
                     </div>
                   )}
