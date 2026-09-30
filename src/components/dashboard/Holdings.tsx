@@ -41,7 +41,7 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
   return (
     <Card title={title} sub={sub} action={viewOnly}>
       <div className="space-y-5">
-        {groups.map(([label, vs]) => (
+        {groups.map(([label, vs], gi) => (
           <div key={label}>
             {/* The group's colour marks its label and the edge of each of its sections */}
             {!only && <div className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={tint(GROUP_SLOT[label] ?? 5)}>
@@ -51,7 +51,8 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
             {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
             {/* Sections run edge to edge of the card, like All positions: rows split by
                 hairlines, the group's colour as a stripe at the left edge */}
-            <div className="-mx-4 border-y border-line sm:-mx-5">
+            {/* The last list runs to the card's bottom edge, its corners following the card's */}
+            <div className={cx('-mx-4 border-t border-line sm:-mx-5', gi === groups.length - 1 ? '-mb-4 overflow-hidden rounded-b-xl sm:-mb-5' : 'border-b')}>
               {vs.map((v) => (
                 <details
                   key={v.id}

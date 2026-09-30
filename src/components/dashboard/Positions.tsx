@@ -26,7 +26,8 @@ export function Positions({ model, linkOf, onDrill }: Props) {
 
   return (
     <Card title="All positions" sub="The lines that roll up into your total, computed in the sheet. Tap a line to see its holdings.">
-      <div className="-mx-4 sm:-mx-5">
+      {/* Runs to the card's bottom edge, so the Total row closes the card */}
+      <div className="-mx-4 -mb-4 overflow-hidden rounded-b-xl sm:-mx-5 sm:-mb-5">
         <div className={cx(GRID, 'border-b border-line px-4 pb-2 text-[11px] font-medium uppercase tracking-wide text-ink-3 sm:px-5')}>
           <span>Asset</span>
           <span className="hidden text-right sm:block">Invested</span>
