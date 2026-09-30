@@ -57,12 +57,13 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                 <details
                   key={v.id}
                   ref={(el) => sectionRef(v.id, el)}
-                  className={cx('group scroll-mt-20 border-l-[3px] bg-surface [&+&]:border-t [&+&]:border-t-line', flash === v.id && 'flash')}
-                  style={{ borderLeftColor: slotColor(GROUP_SLOT[label] ?? 5) }}
+                  className={cx('group scroll-mt-20 bg-surface [&+&]:border-t [&+&]:border-t-line', flash === v.id && 'flash')}
+                  style={{ ['--stripe' as string]: slotColor(GROUP_SLOT[label] ?? 5) }}
                   open={open.has(v.id)}
                   onToggle={(e) => onToggle(v.id, e.currentTarget.open)}
                 >
-                  <summary className="flex cursor-pointer select-none items-center gap-2.5 py-3 pl-[13px] pr-4 transition-colors hover:bg-sunk group-open:border-b group-open:border-grid sm:pl-[17px] sm:pr-5">
+                  {/* The group colour is a short bar inset in each row, so the card's rounded corners never clip it */}
+                  <summary className="relative flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 transition-colors before:absolute before:inset-y-2.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-[var(--stripe)] hover:bg-sunk group-open:border-b group-open:border-grid sm:px-5">
                     <IconChevronRight size={16} stroke={2} className="flex-none text-ink-3 transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
                     <span className="min-w-0 shrink-0 truncate font-medium">{v.name}</span>
                     {v.note && <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{v.note}</span>}
@@ -84,7 +85,7 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
                   </summary>
                   {/* Render the body only when open: long ledgers stay cheap */}
                   {open.has(v.id) && (
-                    <div className="bg-sunk/40 pb-2.5 pl-[13px] pr-4 pt-2 sm:pl-[17px] sm:pr-5">
+                    <div className="bg-sunk/40 px-4 pb-2.5 pt-2 sm:px-5">
                       <Section view={v} canEdit={canEdit} onEdit={onEdit} />
                     </div>
                   )}

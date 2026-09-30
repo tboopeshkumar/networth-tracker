@@ -19,7 +19,7 @@ export function GoldValuation({ v, feed = [] }: { v: Valuation; feed?: FeedRate[
 
   return (
     // Flush with the card's edges like the sections below it; the green stripe and shade mark it as the summary
-    <div className="-mx-4 border-t border-l-[3px] border-line border-l-good bg-sunk/60 py-3.5 pl-[13px] pr-4 sm:-mx-5 sm:pl-[17px] sm:pr-5">
+    <div className="relative -mx-4 border-t border-line bg-sunk/60 px-4 py-3.5 before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-r-full before:bg-good sm:-mx-5 sm:px-5">
       <div className="flex items-baseline justify-between gap-3">
         <Label icon={<IconCoin size={15} stroke={1.75} aria-hidden="true" />}>{v.title ?? 'Gold valuation'}</Label>
         {daily
