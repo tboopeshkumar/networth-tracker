@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  cr, fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
+  fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { BrokerFeed } from '../../lib/brokerFeed';
@@ -89,7 +89,7 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({
         icon: <AmcBadge fund={r.fund} size={36} />, title: text(r.fund), value: inr(r.current), sub: join(r.holder, r.category, r.platform),
-        right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDay(r.navDate)}`,
+        right: gain(r.pnl, r.invested), foot: <>Invested <Amount value={r.invested} /> · NAV {fmtDay(r.navDate)}</>,
       }),
     }),
     view<RowOf<'equity'>>({
@@ -131,7 +131,7 @@ export function buildViews(model: Model): View[] {
       ],
       card: (r) => ({
         title: text(r.holding), value: inr(r.market), sub: join(r.holder, `${num(r.qty)} g`),
-        right: gain(n0(r.market) - n0(r.cost), r.cost), foot: `Cost ${cr(r.cost)} · matures ${fmtDay(r.maturity)}`,
+        right: gain(n0(r.market) - n0(r.cost), r.cost), foot: <>Cost <Amount value={r.cost} /> · matures {fmtDay(r.maturity)}</>,
       }),
     }),
     view<RowOf<'fd'>>({
@@ -152,7 +152,7 @@ export function buildViews(model: Model): View[] {
         return {
           title: text(r.institution), value: inr(r.amount), sub: join(r.holder, isNum(r.rate) ? `${r.rate}%` : ''),
           right: { text: status, tone: statusTone },
-          foot: join(`Matures ${fmtDay(r.maturityDate)}`, isNum(r.maturityAmount) ? `${cr(r.maturityAmount)} at maturity` : ''),
+          foot: <>Matures {fmtDay(r.maturityDate)}{isNum(r.maturityAmount) && <> · <Amount value={r.maturityAmount} /> at maturity</>}</>,
         };
       },
     }),
