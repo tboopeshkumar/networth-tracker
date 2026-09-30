@@ -337,6 +337,8 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
   const signed = (n: unknown) => (isNum(n) && n > 0 ? `+${money(n)}` : money(n));
   const units = (r: Row) => (isNum(r.units) ? num(r.units, r.units % 1 ? 4 : 0) : '');
   const totalLocal = feed.total?.value ?? recs.reduce((a, r) => a + n0(r.value), 0);
+  const investedLocal = feed.total?.invested ?? recs.reduce((a, r) => a + n0(r.invested), 0);
+  const gainLocal = totalLocal - investedLocal;
   const aedInr = n0(model.cells.fxAedInr?.value);
   const toInr = { USD: n0(model.cells.fxUsdAed?.value) * aedInr, AED: aedInr, INR: 1 }[cur] ?? 0;
   const sym = cur === 'USD' ? '$' : cur;
@@ -344,6 +346,14 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
     id, group: 'Investments', name, recs,
     note: isNum(feed.refreshed) ? fmtDay(feed.refreshed) : undefined,
     total: toInr > 0 ? <Amount value={totalLocal * toInr} /> : money(totalLocal),
+    // The account in its own currency, as the broker shows it; the header total is in rupees
+    lead: (
+      <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
+        <span>Invested <b className="font-semibold tabular-nums">{money(investedLocal)}</b></span>
+        <span className="text-ink-3">worth <b className="font-semibold tabular-nums text-ink">{money(totalLocal)}</b></span>
+        <Pill tone={tone(gainLocal)}>{signed(gainLocal)} · {signedPct(ret(gainLocal, investedLocal))}</Pill>
+      </div>
+    ),
     columns: [
       { head: 'Holding', name: true, render: (r) => <>{text(r.symbol)}<div className="sub2">{String(r.name ?? '')}</div></> },
       { head: 'Type', render: (r) => text(r.type) },
