@@ -34,24 +34,28 @@ export function Swatch({ slot }: { slot: number | undefined }) {
 }
 
 /**
- * A fund house's logo on a small white tile (logos are drawn for light
- * backgrounds, so the tile keeps them legible in dark mode too), or its
- * monogram when there's no logo or it fails to load.
+ * A fund house's logo on a white tile (logos are drawn for light backgrounds,
+ * so the tile keeps them legible in dark mode too), or its monogram when
+ * there's no logo or it fails to load. `size` is in CSS pixels.
  */
-export function AmcBadge({ fund }: { fund: unknown }) {
+export function AmcBadge({ fund, size = 24 }: { fund: unknown; size?: number }) {
   const amc = amcOf(fund);
   const [broken, setBroken] = useState(false);
+  const box = { width: size, height: size, borderRadius: Math.round(size * 0.26) };
   if (amc.logo && !broken) {
     return (
-      <span className="inline-grid size-[24px] flex-none place-items-center overflow-hidden rounded-md bg-white ring-1 ring-line" title={amc.name} aria-hidden="true">
-        <img src={`${import.meta.env.BASE_URL}amc/${amc.logo}.png`} alt="" width={22} height={22} className="size-[22px] object-contain" loading="lazy" onError={() => setBroken(true)} />
+      <span className="inline-grid flex-none place-items-center overflow-hidden bg-white ring-1 ring-line" style={box} title={amc.name} aria-hidden="true">
+        <img
+          src={`${import.meta.env.BASE_URL}amc/${amc.logo}.png`} alt="" loading="lazy"
+          width={size - 4} height={size - 4} className="object-contain" onError={() => setBroken(true)}
+        />
       </span>
     );
   }
   return (
     <span
-      className="inline-grid size-[24px] flex-none place-items-center rounded-md text-[9px] font-bold tracking-tight text-white"
-      style={{ background: amc.color }}
+      className="inline-grid flex-none place-items-center font-bold tracking-tight text-white"
+      style={{ ...box, background: amc.color, fontSize: Math.round(size * 0.38) }}
       title={amc.name}
       aria-hidden="true"
     >

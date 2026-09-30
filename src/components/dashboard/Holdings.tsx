@@ -120,7 +120,9 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
           // With nothing else to show beside the sub line, Edit sits there instead of on a row of its own
           const inlineEdit = edit && !c.foot && !c.right;
           return (
-            <div className="border-b border-grid py-2.5 last:border-0" key={r._key}>
+            <div className="flex gap-3 border-b border-grid py-2.5 last:border-0" key={r._key}>
+              {c.icon && <div className="pt-0.5">{c.icon}</div>}
+              <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-3">
                 <span className="min-w-0 flex-1 font-medium">{c.title}</span>
                 <span className="whitespace-nowrap font-semibold tabular-nums">{c.value}</span>
@@ -138,6 +140,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                   {edit && actions(r)}
                 </div>
               )}
+              </div>
             </div>
           );
         })}

@@ -21,6 +21,8 @@ export interface Column<R> {
 }
 
 export interface CardContent {
+  /** shown in its own column beside the card's lines, e.g. the fund house logo */
+  icon?: ReactNode;
   title: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
@@ -76,7 +78,7 @@ export function buildViews(model: Model): View[] {
       edit: editRow('mf'),
       add: { kind: 'add', id: 'mf' },
       columns: [
-        { head: 'Fund', name: true, render: (r) => <span className="flex items-center gap-2.5"><AmcBadge fund={r.fund} /><span>{text(r.fund)}<span className="sub2 block">{text(r.platform)}</span></span></span> },
+        { head: 'Fund', name: true, render: (r) => <span className="flex items-center gap-2.5"><AmcBadge fund={r.fund} size={28} /><span>{text(r.fund)}<span className="sub2 block">{text(r.platform)}</span></span></span> },
         { head: 'Holder', render: (r) => text(r.holder) },
         { head: 'Type', render: (r) => text(r.category) },
         { head: 'Invested', num: true, render: (r) => inr(r.invested) },
@@ -86,7 +88,7 @@ export function buildViews(model: Model): View[] {
         { head: 'NAV date', render: (r) => fmtDate(r.navDate) },
       ],
       card: (r) => ({
-        title: <span className="flex items-center gap-2"><AmcBadge fund={r.fund} />{text(r.fund)}</span>, value: inr(r.current), sub: join(r.holder, r.category, r.platform),
+        icon: <AmcBadge fund={r.fund} size={36} />, title: text(r.fund), value: inr(r.current), sub: join(r.holder, r.category, r.platform),
         right: gain(r.pnl, r.invested), foot: `Invested ${cr(r.invested)} · NAV ${fmtDay(r.navDate)}`,
       }),
     }),
@@ -309,7 +311,7 @@ function npsView(model: Model): View[] {
       </div>
     ),
     columns: [
-      { head: 'Scheme', name: true, render: (r) => <span className="flex items-center gap-2.5"><AmcBadge fund={r.scheme} /><span>{text(r.scheme)}<span className="sub2 block">{text(r.schemeId)}</span></span></span> },
+      { head: 'Scheme', name: true, render: (r) => <span className="flex items-center gap-2.5"><AmcBadge fund={r.scheme} size={28} /><span>{text(r.scheme)}<span className="sub2 block">{text(r.schemeId)}</span></span></span> },
       { head: 'Units', num: true, render: (r) => num(r.units, 4) },
       { head: 'NAV', num: true, render: (r) => num(r.nav, 4) },
       { head: 'Value', num: true, render: (r) => inr(r.value), className: () => 'strong' },
@@ -317,7 +319,7 @@ function npsView(model: Model): View[] {
       { head: 'NAV date', render: (r) => fmtDate(r.navDate) },
     ],
     card: (r) => ({
-      title: <span className="flex items-center gap-2"><AmcBadge fund={r.scheme} />{text(r.scheme)}</span>, value: inr(r.value), sub: join(r.schemeId, `${num(r.units, 4)} units`),
+      icon: <AmcBadge fund={r.scheme} size={36} />, title: text(r.scheme), value: inr(r.value), sub: join(r.schemeId, `${num(r.units, 4)} units`),
       right: { text: pct(value ? n0(r.value) / value : null) },
       foot: `NAV ${num(r.nav, 4)} · ${fmtDay(r.navDate)}`,
     }),
