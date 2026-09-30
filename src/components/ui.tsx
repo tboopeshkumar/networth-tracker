@@ -33,12 +33,24 @@ export function Swatch({ slot }: { slot: number | undefined }) {
   return <span className="inline-block size-2 flex-none rounded-full" style={{ background: slotColor(slot) }} aria-hidden="true" />;
 }
 
-/** A fund house's monogram: its initials on a disc in a colour close to its brand. */
+/**
+ * A fund house's logo on a small white tile (logos are drawn for light
+ * backgrounds, so the tile keeps them legible in dark mode too), or its
+ * monogram when there's no logo or it fails to load.
+ */
 export function AmcBadge({ fund }: { fund: unknown }) {
   const amc = amcOf(fund);
+  const [broken, setBroken] = useState(false);
+  if (amc.logo && !broken) {
+    return (
+      <span className="inline-grid size-[24px] flex-none place-items-center overflow-hidden rounded-md bg-white ring-1 ring-line" title={amc.name} aria-hidden="true">
+        <img src={`${import.meta.env.BASE_URL}amc/${amc.logo}.png`} alt="" width={22} height={22} className="size-[22px] object-contain" loading="lazy" onError={() => setBroken(true)} />
+      </span>
+    );
+  }
   return (
     <span
-      className="inline-grid size-[22px] flex-none place-items-center rounded-full text-[9px] font-bold tracking-tight text-white"
+      className="inline-grid size-[24px] flex-none place-items-center rounded-md text-[9px] font-bold tracking-tight text-white"
       style={{ background: amc.color }}
       title={amc.name}
       aria-hidden="true"

@@ -266,6 +266,16 @@ test('fund houses are recognised from fund names, with a fallback', () => {
   assert.equal(amcOf('Some Unknown Fund').initials, 'SU');
 });
 
+test('every fund house logo the app refers to is in public/amc', () => {
+  const houses = ['Aditya Birla', 'Axis', 'Bandhan', 'Canara', 'DSP', 'Edelweiss', 'Groww', 'HDFC', 'HSBC', 'ICICI', 'Invesco',
+    'Jio', 'Kotak', 'LIC', 'Mirae', 'Nippon', 'Parag Parikh', 'WhiteOak', 'Zerodha', 'SBI', 'UTI'];
+  for (const h of houses) {
+    const logo = amcOf(`${h} Example Fund`).logo;
+    if (logo) assert.ok(existsSync(new URL(`../public/amc/${logo}.png`, import.meta.url)), `${h}: public/amc/${logo}.png`);
+  }
+  assert.equal(amcOf('SBI Example Fund').logo, undefined, 'houses without a usable icon keep the monogram');
+});
+
 withFixture('every mutual fund in the sheet maps to a known fund house', () => {
   const f = fixture();
   const m = buildModel(f.values, f.formulas);
