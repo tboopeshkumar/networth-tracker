@@ -9,7 +9,7 @@ const ICON = { size: 15, stroke: 1.75, 'aria-hidden': true } as const;
 /** One composition figure: amount and its share of the total. */
 function ShareTile({ label, icon, value, share, slot }: { label: string; icon: ReactNode; value: number; share: number; slot: number }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-line p-3.5 shadow-card sm:p-4" style={tint(slot)}>
+    <div className="min-w-0 rounded-xl border border-line p-3.5 shadow-card sm:p-4" style={tint(slot)}>
       {/* two lines reserved on phones, so the three values line up */}
       <Label icon={icon} className="min-h-[2lh] items-start !text-current opacity-85 sm:min-h-0 sm:items-center">{label}</Label>
       <div className="mt-1 text-lg font-semibold tracking-tight tabular-nums text-ink sm:text-[22px]"><Amount value={value} /></div>

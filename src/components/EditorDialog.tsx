@@ -39,7 +39,7 @@ export function EditorDialog({ request, model, data, sheetTitle, onWrite, onClos
   }, []);
 
   return (
-    <dialog ref={ref} className="m-auto w-[min(560px,calc(100vw-20px))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
+    <dialog ref={ref} className="m-auto w-[min(560px,calc(100vw-20px))] rounded-xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
       <div className="max-h-[calc(100vh-60px)] overflow-y-auto p-5 sm:p-6">
         {def instanceof Error
           ? <Problem message={def.message} onClose={() => ref.current?.close()} />

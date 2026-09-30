@@ -12,7 +12,7 @@ export function Checks({ model, values, canEdit }: { model: Model; values: Grids
         ? (
           <div className="space-y-2">
             {checks.map((c) => (
-              <div className="flex gap-2.5 rounded-xl border border-warn/35 bg-warn-soft px-3 py-2.5 text-[13px]" key={c.id}>
+              <div className="flex gap-2.5 rounded-lg border border-warn/35 bg-warn-soft px-3 py-2.5 text-[13px]" key={c.id}>
                 <IconAlertTriangle size={17} stroke={1.75} className="mt-px flex-none text-[color-mix(in_srgb,var(--warn)_70%,var(--ink-1))]" aria-hidden="true" />
                 <span><b className="font-semibold">{c.title}</b> <span className="text-ink-2">{c.detail}</span></span>
               </div>

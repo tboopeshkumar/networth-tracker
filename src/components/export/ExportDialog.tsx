@@ -47,7 +47,7 @@ export function ExportDialog({ model, values, sheetTitle, onClose }: Props) {
   };
 
   return (
-    <dialog ref={ref} className="m-auto w-[min(480px,calc(100vw-20px))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
+    <dialog ref={ref} className="m-auto w-[min(480px,calc(100vw-20px))] rounded-xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
       <div className="p-5 sm:p-6">
         <h3 className="mb-1.5 text-base font-semibold">Export to PDF</h3>
         <p className="mb-3.5 text-[13px] text-ink-2">

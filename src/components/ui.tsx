@@ -34,9 +34,9 @@ export function Swatch({ slot }: { slot: number | undefined }) {
 
 /* ---------- surfaces ---------- */
 
-export const CARD = 'rounded-2xl border border-line bg-surface shadow-card';
+export const CARD = 'rounded-xl border border-line bg-surface shadow-card';
 /** A panel inside a card: stats, tiles, the gold valuation. */
-export const PANEL = 'rounded-xl border border-line bg-sunk';
+export const PANEL = 'rounded-lg border border-line bg-sunk';
 
 export function Card({ title, sub, action, children, className }: {
   title: ReactNode; sub?: ReactNode; action?: ReactNode; children: ReactNode; className?: string;

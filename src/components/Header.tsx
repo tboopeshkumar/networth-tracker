@@ -51,7 +51,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
           </button>
           <details className="relative" ref={menu}>
             <summary className={BTN.replace('px-3', 'px-2')} aria-label="More"><IconDots size={16} stroke={1.75} aria-hidden="true" /></summary>
-            <div className="absolute right-0 top-[calc(100%+6px)] grid min-w-[230px] rounded-xl border border-line bg-surface p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+            <div className="absolute right-0 top-[calc(100%+6px)] grid min-w-[230px] rounded-lg border border-line bg-surface p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
               <div className="mb-1 border-b border-line px-2.5 pb-2 pt-1.5 text-xs text-ink-3">
                 Signed in as
                 <b className="block break-all font-medium text-ink">{canEdit ? account : `${account} (view only)`}</b>
