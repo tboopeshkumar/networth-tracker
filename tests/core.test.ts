@@ -19,6 +19,7 @@ import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
 import { readBrokerFeed } from '../src/lib/brokerFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { makeLinker } from '../src/lib/links';
+import { amcOf } from '../src/lib/amc';
 import { parseSheetId } from '../src/lib/picker';
 import {
   ConflictError, V, execute, loadAll, planCellEdit, planInsert, planMetalPurchase, planRowEdit,
@@ -256,6 +257,20 @@ test('the eToro Feed tab is read by header, with its Total kept apart', () => {
   assert.deepEqual([ibkr.rows[0].value, ibkr.total?.value], [120, 120]);
   assert.equal(readBrokerFeed(undefined), null);
   assert.equal(readBrokerFeed([['something else']]), null);
+});
+
+test('fund houses are recognised from fund names, with a fallback', () => {
+  assert.equal(amcOf('Example Prudential via ICICI Direct').initials, 'IP');
+  assert.equal(amcOf('Parag Parikh Flexi Cap Fund').initials, 'PP');
+  assert.equal(amcOf('Some Unknown Fund').color, '#6b7280', 'unknown houses are grey');
+  assert.equal(amcOf('Some Unknown Fund').initials, 'SU');
+});
+
+withFixture('every mutual fund in the sheet maps to a known fund house', () => {
+  const f = fixture();
+  const m = buildModel(f.values, f.formulas);
+  const unknown = m.rows.mf.filter((r) => amcOf(r.fund).color === '#6b7280');
+  assert.equal(unknown.length, 0, `unrecognised: ${unknown.map((r) => amcOf(r.fund).initials).join(', ')}`);
 });
 
 /* ---------- writes ---------- */

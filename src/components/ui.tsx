@@ -2,6 +2,7 @@ import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { cr, inr, isNum, signedCr, signedInr } from '../lib/format';
 import type { EditRequest } from '../lib/editors';
+import { amcOf } from '../lib/amc';
 
 /** Colour follows the category, never its rank (validated palette, see app.css). */
 export const CATEGORY_SLOT: Record<string, number> = {
@@ -30,6 +31,21 @@ export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Bo
 
 export function Swatch({ slot }: { slot: number | undefined }) {
   return <span className="inline-block size-2 flex-none rounded-full" style={{ background: slotColor(slot) }} aria-hidden="true" />;
+}
+
+/** A fund house's monogram: its initials on a disc in a colour close to its brand. */
+export function AmcBadge({ fund }: { fund: unknown }) {
+  const amc = amcOf(fund);
+  return (
+    <span
+      className="inline-grid size-[22px] flex-none place-items-center rounded-full text-[9px] font-bold tracking-tight text-white"
+      style={{ background: amc.color }}
+      title={amc.name}
+      aria-hidden="true"
+    >
+      {amc.initials}
+    </span>
+  );
 }
 
 /* ---------- surfaces ---------- */
