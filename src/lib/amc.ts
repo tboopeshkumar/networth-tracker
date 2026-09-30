@@ -33,7 +33,7 @@ const AMCS: [RegExp, Amc][] = [
   [/\bsbi\b/i, { name: 'SBI', initials: 'SB', color: '#1b4f9c' }],
   [/sundaram/i, { name: 'Sundaram', initials: 'SU', color: '#0b6e4f' }],
   [/\btata\b/i, { name: 'Tata', initials: 'TA', color: '#486aae' }],
-  [/\buti\b/i, { name: 'UTI', initials: 'UT', color: '#1a4fa0' }],
+  [/\buti\b/i, { name: 'UTI', initials: 'UT', color: '#1a4fa0', logo: 'uti' }],
   [/white\s*oak/i, { name: 'WhiteOak Capital', initials: 'WO', color: '#1e6b3a', logo: 'whiteoak' }],
   [/zerodha/i, { name: 'Zerodha', initials: 'ZE', color: '#387ed1', logo: 'zerodha' }],
 ];

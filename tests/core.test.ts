@@ -269,6 +269,7 @@ test('fund houses are recognised from fund names, with a fallback', () => {
 test('every fund house logo the app refers to is in public/amc', () => {
   const houses = ['Aditya Birla', 'Axis', 'Bandhan', 'Canara', 'DSP', 'Edelweiss', 'Groww', 'HDFC', 'HSBC', 'ICICI', 'Invesco',
     'Jio', 'Kotak', 'LIC', 'Mirae', 'Nippon', 'Parag Parikh', 'WhiteOak', 'Zerodha', 'SBI', 'UTI'];
+  assert.equal(amcOf('UTI Example Fund').logo, 'uti');
   for (const h of houses) {
     const logo = amcOf(`${h} Example Fund`).logo;
     if (logo) assert.ok(existsSync(new URL(`../public/amc/${logo}.png`, import.meta.url)), `${h}: public/amc/${logo}.png`);
