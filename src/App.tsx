@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { EditorDialog } from './components/EditorDialog';
 import { ExportDialog } from './components/export/ExportDialog';
+import { CasImportDialog } from './components/cas/CasImportDialog';
 import { Header } from './components/Header';
 import { LoadingScreen, PickScreen, SetupScreen, SignInScreen } from './components/Screens';
 import { useToast } from './components/Toast';
@@ -16,6 +17,7 @@ export function App() {
   const s = useSession(toast);
   const [editing, setEditing] = useState<EditRequest | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const canEdit = s.identity?.canEdit ?? false;
   const updateReady = useUpdateCheck();
 
@@ -46,6 +48,7 @@ export function App() {
         onDisconnect={s.revoke}
         onSignOut={() => { setEditing(null); s.lock('Signed out.'); }}
         onExport={() => setExporting(true)}
+        onImportCas={() => { if (s.tokenValid()) setImporting(true); else s.lock('Your session expired — sign in again to continue.'); }}
       />
       {updateReady && (
         <div role="status" className="flex items-center justify-center gap-3 border-b border-line bg-accent-soft px-4 py-1.5 text-[13px]">
@@ -60,6 +63,9 @@ export function App() {
         {(s.phase === 'loading' || s.phase === 'booting') && <LoadingScreen />}
         {session && <Dashboard loaded={session.loaded} canEdit={canEdit} onEdit={onEdit} />}
       </main>
+      {importing && session && (
+        <CasImportDialog model={session.loaded.model} onWrite={s.write} onClose={() => setImporting(false)} />
+      )}
       {exporting && session && (
         <ExportDialog
           model={session.loaded.model}
