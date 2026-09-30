@@ -2,7 +2,7 @@ import { IconCoin } from '@tabler/icons-react';
 import { fmtDate, inr, isNum, num } from '../../lib/format';
 import type { GoldValuation as Valuation } from '../../lib/jewellery';
 import { feedRateFor, type FeedRate } from '../../lib/ratesFeed';
-import { Amount, Label, PANEL, cx } from '../ui';
+import { Amount, Label } from '../ui';
 
 /** Grams per sovereign (pavan), the unit gold jewellery is usually counted in. */
 const SOVEREIGN_G = 8;
@@ -18,7 +18,8 @@ export function GoldValuation({ v, feed = [] }: { v: Valuation; feed?: FeedRate[
     .replace(v.rateLive || daily ? /rate:?\s*(live|daily)[^.]*\.?/i : /$^/, '').trim();
 
   return (
-    <div className={cx(PANEL, 'mb-2 border-l-[3px] border-l-good px-4 py-3.5')}>
+    // Flush with the card's edges like the sections below it; the green stripe and shade mark it as the summary
+    <div className="-mx-4 border-t border-l-[3px] border-line border-l-good bg-sunk/60 py-3.5 pl-[13px] pr-4 sm:-mx-5 sm:pl-[17px] sm:pr-5">
       <div className="flex items-baseline justify-between gap-3">
         <Label icon={<IconCoin size={15} stroke={1.75} aria-hidden="true" />}>{v.title ?? 'Gold valuation'}</Label>
         {daily
