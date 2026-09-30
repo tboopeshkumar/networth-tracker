@@ -1,5 +1,6 @@
-import { IconDots, IconRefresh } from '@tabler/icons-react';
+import { IconDots, IconMoon, IconRefresh, IconSun } from '@tabler/icons-react';
 import { useRef } from 'react';
+import { useTheme } from '../hooks/useTheme';
 import { BUILT, VERSION } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
 import { BTN } from './ui';
@@ -29,6 +30,8 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
     fn();
   };
   const account = demo ? 'demo mode' : email;
+  const { theme, chosen, choose } = useTheme();
+  const next = theme === 'dark' ? 'light' : 'dark';
 
   return (
     <header className="safe-bar sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line bg-page/85 pb-2.5 backdrop-blur-md">
@@ -43,12 +46,18 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
           </div>
         </div>
       </div>
-      {showActions && (
-        <div className="flex flex-none items-center gap-1.5">
+      <div className="flex flex-none items-center gap-1.5">
+        {showActions && (
           <button type="button" className={BTN} title="Reload from the sheet" aria-label="Reload from the sheet" onClick={onRefresh}>
             <IconRefresh size={16} stroke={1.75} aria-hidden="true" />
             <span className="hidden sm:inline">Refresh</span>
           </button>
+        )}
+        {/* Always there, so the sign-in screen can switch too */}
+        <button type="button" className={BTN.replace('px-3', 'px-2')} title={`Switch to ${next} mode`} aria-label={`Switch to ${next} mode`} onClick={() => choose(next)}>
+          {theme === 'dark' ? <IconSun size={16} stroke={1.75} aria-hidden="true" /> : <IconMoon size={16} stroke={1.75} aria-hidden="true" />}
+        </button>
+        {showActions && (
           <details className="relative" ref={menu}>
             <summary className={BTN.replace('px-3', 'px-2')} aria-label="More"><IconDots size={16} stroke={1.75} aria-hidden="true" /></summary>
             <div className="absolute right-0 top-[calc(100%+6px)] grid min-w-[230px] rounded-lg border border-line bg-surface p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
@@ -57,6 +66,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
                 <b className="block break-all font-medium text-ink">{canEdit ? account : `${account} (view only)`}</b>
               </div>
               <button type="button" className={MENU_ITEM} onClick={pick(onExport)}>Export to PDF…</button>
+              {chosen && <button type="button" className={MENU_ITEM} onClick={pick(() => choose(null))}>Match device appearance</button>}
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onSwitchSheet)}>Choose a different sheet</button>}
               {!demo && <button type="button" className={MENU_ITEM} onClick={pick(onDisconnect)}>Revoke Google access</button>}
               <button type="button" className={MENU_ITEM} onClick={pick(onSignOut)}>Sign out</button>
@@ -65,8 +75,8 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
               </div>
             </div>
           </details>
-        </div>
-      )}
+        )}
+      </div>
     </header>
   );
 }

@@ -36,8 +36,11 @@
   /* how much of a category colour washes a tinted surface */
   --tint: 11%;
 }
+/* Dark tokens: follow the device unless the viewer picked a theme in the app
+   (html[data-theme], set by useTheme). The same values appear in both blocks
+   below: change one, change the other. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     /* shadows don't read on dark: lifted surfaces and a top highlight do the work */
     --page: #0a0a0a;
@@ -61,6 +64,30 @@
     --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     --tint: 17%;
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* shadows don't read on dark: lifted surfaces and a top highlight do the work */
+  --page: #0a0a0a;
+  --surface: #1a1a19;
+  --sunk: #222221;
+  --ink-1: #f5f5f3;
+  --ink-2: #c3c2b7;
+  --ink-3: #8f8d86;
+  --grid: #2e2e2c;
+  --axis: #3b3b38;
+  --line: rgba(255, 255, 255, 0.11);
+  --good: #3dbb3d;
+  --bad: #ef6b6b;
+  --accent: #4b93ec;
+  --s1: #3b82f6; --s2: #fb923c; --s3: #22c55e; --s4: #facc15;
+  --s5: #22d3ee; --s6: #a78bfa; --s7: #e879f9;
+  --good-soft: color-mix(in srgb, var(--good) 16%, var(--surface));
+  --bad-soft: color-mix(in srgb, var(--bad) 15%, var(--surface));
+  --warn-soft: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --tint: 17%;
 }
 
 @theme inline {
