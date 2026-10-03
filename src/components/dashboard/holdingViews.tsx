@@ -35,6 +35,8 @@ export interface View<R extends Row = Row> {
   group: string;
   name: string;
   total: ReactNode;
+  /** the section's worth in rupees, when it has one: group bands add these up */
+  inr?: number;
   /** shown in the section header, e.g. the date the prices are from */
   note?: string;
   recs: R[];
@@ -72,7 +74,7 @@ export function buildViews(model: Model): View[] {
   const R = model.rows;
   const views: View[] = [
     view<RowOf<'mf'>>({
-      id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, total: <Amount value={sum(R.mf, 'current')} />,
+      id: 'mf', group: 'Investments', name: 'Mutual funds', recs: R.mf, inr: sum(R.mf, 'current'), total: <Amount value={sum(R.mf, 'current')} />,
       // The oldest NAV in the list: the date the whole total is only as fresh as
       note: oldest(R.mf.map((r) => r.navDate)),
       edit: editRow('mf'),
@@ -93,7 +95,7 @@ export function buildViews(model: Model): View[] {
       }),
     }),
     view<RowOf<'equity'>>({
-      id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, total: <Amount value={sum(R.equity, 'currentInr')} />,
+      id: 'equity', group: 'Investments', name: 'Equity', recs: R.equity, inr: sum(R.equity, 'currentInr'), total: <Amount value={sum(R.equity, 'currentInr')} />,
       note: oldest(R.equity.map((r) => r.navDate)),
       edit: editRow('equity'),
       columns: [
@@ -116,7 +118,7 @@ export function buildViews(model: Model): View[] {
     ...brokerView(model, model.etoro, 'etoro', 'eToro'),
     ...brokerView(model, model.ibkr, 'ibkr', 'IBKR'),
     view<RowOf<'sgb'>>({
-      id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, total: <Amount value={sum(R.sgb, 'market')} />,
+      id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, inr: sum(R.sgb, 'market'), total: <Amount value={sum(R.sgb, 'market')} />,
       note: oldest(R.sgb.map((r) => r.valueDate)),
       edit: editRow('sgb'),
       columns: [
@@ -135,7 +137,7 @@ export function buildViews(model: Model): View[] {
       }),
     }),
     view<RowOf<'fd'>>({
-      id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, total: <Amount value={sum(R.fd, 'amount')} />,
+      id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, inr: sum(R.fd, 'amount'), total: <Amount value={sum(R.fd, 'amount')} />,
       edit: editRow('fd'),
       add: { kind: 'add', id: 'fd' },
       columns: [
@@ -204,7 +206,7 @@ export function buildViews(model: Model): View[] {
 
   if (R.givenOut.length) {
     views.push(view<RowOf<'givenOut'>>({
-      id: 'givenOut', group: 'Money lent', name: 'Receivables', recs: R.givenOut, total: <Amount value={sum(R.givenOut, 'amount')} />,
+      id: 'givenOut', group: 'Money lent', name: 'Receivables', recs: R.givenOut, inr: sum(R.givenOut, 'amount'), total: <Amount value={sum(R.givenOut, 'amount')} />,
       columns: [
         { head: 'Person', name: true, render: (r) => text(r.person) },
         { head: 'Given on', render: (r) => fmtDate(r.date) },
@@ -219,7 +221,7 @@ export function buildViews(model: Model): View[] {
   for (const L of Object.values(model.ledgers)) {
     const notes = (r: Row) => join(r.note, r.detail, r.interest);
     views.push(view({
-      id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, total: <Amount value={L.balance} />, ledger: L,
+      id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, inr: n0(L.balance), total: <Amount value={L.balance} />, ledger: L,
       columns: [
         { head: 'Date', render: (r) => fmtDate(r.date) },
         { head: 'Description', name: true, render: (r) => text(r.description) },
@@ -300,7 +302,7 @@ function npsView(model: Model): View[] {
   const invested = model.cells.npsInvested?.value;
   const gain = isNum(invested) ? value - invested : null;
   return [view<RowOf<'nps'>>({
-    id: 'nps', group: 'Investments', name: 'NPS', recs, total: <Amount value={value} />,
+    id: 'nps', group: 'Investments', name: 'NPS', recs, inr: value, total: <Amount value={value} />,
     note: oldest(recs.map((r) => r.navDate)),
     edit: editRow('nps'),
     lead: isNum(invested) && (
@@ -347,6 +349,7 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
   return [view<Row>({
     id, group: 'Investments', name, recs,
     note: isNum(feed.refreshed) ? fmtDay(feed.refreshed) : undefined,
+    inr: toInr > 0 ? totalLocal * toInr : undefined,
     total: toInr > 0 ? <Amount value={totalLocal * toInr} /> : money(totalLocal),
     // The account in its own currency, as the broker shows it; the header total is in rupees
     lead: (
@@ -377,6 +380,11 @@ export const JEWELLERY_GROUP = 'Jewellery · not in net worth';
 export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent', JEWELLERY_GROUP];
 
 /** A line under a group's heading, where the group needs explaining. */
+/** A group's worth in rupees: only when every section in it has one (grams and ounces don't add up). */
+export function groupInr(views: View[]): number | undefined {
+  return views.every((v) => isNum(v.inr)) ? views.reduce((a, v) => a + (v.inr ?? 0), 0) : undefined;
+}
+
 export function groupNote(model: Model, group: string): string | null {
   if (group === JEWELLERY_GROUP && model.jewellery) return 'For reference only — not counted in your net worth.';
   if (group === 'Cash' && (model.tables.duesInr || model.tables.duesAed)) return 'Dues are deducted from the matching bank total.';

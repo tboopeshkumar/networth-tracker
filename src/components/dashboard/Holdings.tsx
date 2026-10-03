@@ -3,9 +3,9 @@ import { useMemo } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
-import { Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
+import { Amount, Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
-import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupNote, type View } from './holdingViews';
+import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupInr, groupNote, type View } from './holdingViews';
 
 interface Props {
   model: Model;
@@ -40,19 +40,16 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
 
   return (
     <Card title={title} sub={sub} action={viewOnly}>
-      <div className="space-y-5">
+      <div className="space-y-6">
         {groups.map(([label, vs], gi) => (
           <div key={label}>
-            {/* The group's colour marks its label and the edge of each of its sections */}
-            {!only && <div className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={tint(GROUP_SLOT[label] ?? 5)}>
-              <span className="inline-block size-1.5 rounded-full" style={{ background: slotColor(GROUP_SLOT[label] ?? 5) }} />{label}
-            </div>}
-            {!only && groupNote(model, label) && <p className="-mt-1 mb-2 px-0.5 text-xs text-ink-2">{groupNote(model, label)}</p>}
+            {/* Each group opens with a band in its colour, edge to edge, with its total when it has one */}
+            {!only && <GroupBand label={label} note={groupNote(model, label)} total={groupInr(vs)} />}
             {label === JEWELLERY_GROUP && model.jewellery && <GoldValuation v={model.jewellery.valuation} feed={model.ratesFeed} />}
             {/* Sections run edge to edge of the card, like All positions: rows split by
                 hairlines, the group's colour as a stripe at the left edge */}
             {/* The last list runs to the card's bottom edge, its corners following the card's */}
-            <div className={cx('-mx-4 border-t border-line sm:-mx-5', gi === groups.length - 1 ? '-mb-4 overflow-hidden rounded-b-xl sm:-mb-5' : 'border-b')}>
+            <div className={cx('-mx-4 sm:-mx-5', only && 'border-t border-line', gi === groups.length - 1 ? '-mb-4 overflow-hidden rounded-b-xl sm:-mb-5' : 'border-b border-line')}>
               {vs.map((v) => (
                 <details
                   key={v.id}
@@ -96,6 +93,22 @@ export function Holdings({ model, canEdit, onEdit, open, onToggle, flash, sectio
         ))}
       </div>
     </Card>
+  );
+}
+
+/** A group's heading: a tinted band across the card with a solid bar in the group's colour, its name at the left and its total at the right. */
+function GroupBand({ label, note, total }: { label: string; note: string | null; total: number | undefined }) {
+  return (
+    <div
+      className="relative -mx-4 flex items-center gap-3 border-y border-line px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--band)] sm:-mx-5 sm:px-5"
+      style={{ ...tint(GROUP_SLOT[label] ?? 5), ['--band' as string]: slotColor(GROUP_SLOT[label] ?? 5) }}
+    >
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[13px] font-semibold">{label}</h3>
+        {note && <p className="text-xs opacity-80">{note}</p>}
+      </div>
+      {total !== undefined && <Amount value={total} className="text-[13px] font-semibold tabular-nums" />}
+    </div>
   );
 }
 
