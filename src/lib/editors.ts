@@ -31,8 +31,8 @@ export interface Field {
   plain?: boolean;
 }
 
-export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed';
-export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed';
+export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate';
+export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
 export type CellPath =
   | 'cells.fxAedInr' | 'cells.fxUsdAed' | 'cells.npsInvested' | 'cells.npsGain'
   | 'summaries.goldUae.currentAed' | 'summaries.silverUae.sellPrice';
@@ -45,7 +45,7 @@ export type EditRequest =
   | { kind: 'remove'; id: RemovableRow; key: string };
 
 /** Rows the app offers to delete: plain lists with nothing hanging off them. */
-export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed';
+export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
 
 export type Values = Record<string, string>;
 
@@ -163,6 +163,10 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
     case 'bankAed':
       name = `${rec.account} · ${rec.holder}`;
       fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder / notes', rec.holder), money('balance', 'Balance (AED)', rec.balance, { aed: true })];
+      break;
+    case 'realEstate':
+      name = String(rec.property);
+      fields = [text('property', 'Property', rec.property, { required: true }), text('provider', 'Provider', rec.provider), money('valueAed', 'Value (AED)', rec.valueAed, { aed: true })];
       break;
   }
   const title = `Edit ${name}`;
@@ -369,6 +373,15 @@ function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
         },
       };
     }
+    case 'realEstate': {
+      const rows = model.rows.realEstate;
+      if (!model.tables.realEstate) throw new Error('That table is no longer in the sheet. Refresh and try again.');
+      return simple('realEstate', 'Add property', [
+        text('property', 'Property', '', { required: true }),
+        text('provider', 'Provider', rows.at(-1)?.provider ?? '', { list: uniq(rows.map((r) => r.provider)) }),
+        money('valueAed', 'Value (AED)', '', { required: true, aed: true }),
+      ], 'Added at the end of the list; the tab’s total includes it.');
+    }
     case 'fd':
       return simple('fd', 'Add fixed deposit', [
         date('date', 'Invested on', today, { required: true }),
@@ -418,20 +431,21 @@ function removeEditor(model: Model, id: RemovableRow, rec: Row | undefined): Edi
   const tbl = model.tables[id];
   if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
   const due = id === 'duesInr' || id === 'duesAed';
-  const aed = id === 'bankAed' || id === 'duesAed';
-  const title = due ? `Delete ${String(rec.item)}` : `Delete ${String(rec.account)} · ${String(rec.holder)}`;
-  const amount = due ? rec.amount : rec.balance;
+  const property = id === 'realEstate';
+  const aed = id === 'bankAed' || id === 'duesAed' || property;
+  const title = due ? `Delete ${String(rec.item)}` : property ? `Delete ${String(rec.property)}` : `Delete ${String(rec.account)} · ${String(rec.holder)}`;
+  const amount = due ? rec.amount : property ? rec.valueAed : rec.balance;
   const shown = isNum(amount) && amount !== 0 ? (aed ? `AED ${num(amount)}` : inr(amount)) : null;
   return {
     title,
     danger: true,
-    hint: `Removes this ${due ? 'item' : "account's row"} from ${tbl.spec.tab}. The rows below it move up; totals and everything else on the tab stay where they are.`,
+    hint: `Removes this ${due ? 'item' : property ? 'property' : "account's row"} from ${tbl.spec.tab}. The rows below it move up; totals and everything else on the tab stay where they are.`,
     fields: [],
     build() {
       return {
         plan: planRemove(model, id, rec, title),
         warn: shown
-          ? [due ? `${shown} stops being deducted, so your available cash and net worth go up by it.` : `Its balance of ${shown} drops out of your totals and net worth.`]
+          ? [due ? `${shown} stops being deducted, so your available cash and net worth go up by it.` : `Its ${property ? 'value' : 'balance'} of ${shown} drops out of your totals and net worth.`]
           : [],
       };
     },

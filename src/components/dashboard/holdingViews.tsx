@@ -158,6 +158,7 @@ export function buildViews(model: Model): View[] {
         };
       },
     }),
+    ...realEstateView(model),
     view<RowOf<'bankInr'>>({
       id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: <Amount value={sum(R.bankInr, 'balance')} />,
       edit: editRow('bankInr'),
@@ -263,6 +264,32 @@ export function buildViews(model: Model): View[] {
   });
 
   return views;
+}
+
+/** Fractional property shares, valued in AED: the section's total is shown in rupees like the rest of Investments. */
+function realEstateView(model: Model): View[] {
+  if (!model.tables.realEstate) return [];
+  const recs = model.rows.realEstate;
+  const aed = (n: unknown) => (isNum(n) ? `AED ${num(n, 0)}` : '—');
+  const totalAed = sum(recs, 'valueAed');
+  const toInr = n0(model.cells.fxAedInr?.value);
+  return [view<RowOf<'realEstate'>>({
+    id: 'realEstate', group: 'Investments', name: 'Real estate', recs,
+    inr: toInr > 0 ? totalAed * toInr : undefined,
+    total: toInr > 0 ? <Amount value={totalAed * toInr} /> : aed(totalAed),
+    edit: editRow('realEstate'), add: { kind: 'add', id: 'realEstate' },
+    remove: (r) => ({ kind: 'remove', id: 'realEstate', key: r._key }),
+    columns: [
+      { head: 'Property', name: true, render: (r) => text(r.property) },
+      { head: 'Provider', render: (r) => text(r.provider) },
+      { head: 'Value (AED)', num: true, render: (r) => aed(r.valueAed), className: () => 'strong' },
+      ...(toInr > 0 ? [{ head: 'Value (INR)', num: true, render: (r: RowOf<'realEstate'>) => (isNum(r.valueAed) ? inr(r.valueAed * toInr) : '—') }] : []),
+    ],
+    card: (r) => ({
+      title: text(r.property), value: aed(r.valueAed), sub: text(r.provider),
+      foot: toInr > 0 && isNum(r.valueAed) ? <>≈ <Amount value={r.valueAed * toInr} /></> : undefined,
+    }),
+  })];
 }
 
 /** Dues / pending expenses: what the sheet subtracts from each currency's cash. */

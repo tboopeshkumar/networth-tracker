@@ -3,7 +3,7 @@
 import type { Model, NetWorthRow } from './model';
 
 export type ViewId =
-  | 'mf' | 'equity' | 'etoro' | 'ibkr' | 'nps' | 'duesInr' | 'duesAed' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'goldUae' | 'silverUae' | 'givenOut'
+  | 'mf' | 'equity' | 'etoro' | 'ibkr' | 'nps' | 'duesInr' | 'duesAed' | 'sgb' | 'fd' | 'realEstate' | 'bankInr' | 'bankAed' | 'goldUae' | 'silverUae' | 'givenOut'
   | `ledger:${string}` | `jewels:${number}`;
 
 /** Matched on words rather than exact names, so renaming a line doesn't break it. */
@@ -11,6 +11,7 @@ function byName(r: NetWorthRow): ViewId | null {
   const a = String(r.asset ?? '').toLowerCase();
   const uae = r.location === 'UAE';
   if (/mutual fund/.test(a)) return 'mf';
+  if (/real estate|property/.test(a)) return 'realEstate';
   if (/\bnps\b|national pension/.test(a)) return 'nps';
   if (/sovereign gold|sgb/.test(a)) return 'sgb';
   if (/gold/.test(a)) return uae ? 'goldUae' : 'sgb';
@@ -38,7 +39,7 @@ export function makeLinker(model: Model): (r: NetWorthRow) => ViewId | null {
     }
     const v = byName(r);
     // Optional sections only link when the sheet has them
-    if ((v === 'givenOut' && !model.rows.givenOut.length) || (v === 'nps' && !model.rows.nps.length)) return null;
+    if ((v === 'givenOut' && !model.rows.givenOut.length) || (v === 'nps' && !model.rows.nps.length) || (v === 'realEstate' && !model.tables.realEstate)) return null;
     return v;
   };
 }
