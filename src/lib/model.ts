@@ -30,6 +30,8 @@ export interface Spec<F extends string = string> {
   end: RegExp | null;
   headers: Record<F, string>;
   optionalHeaders?: Record<string, string>;
+  /** looser matches for optional headers people word their own way, tried when the exact text isn't there */
+  aliases?: Record<string, RegExp>;
   /** a sheet without this section still loads */
   optional?: boolean;
   /** shares its rows with another table beside it: row inserts stay within its own columns */
@@ -131,6 +133,8 @@ export const SPECS = {
     headers: { provider: 'Provider', property: 'Property', valueAed: 'Value (AED)' },
     // Invested is what was paid for the share, in AED like its value
     optionalHeaders: { invested: 'Invested', valueInr: 'Value (INR)' },
+    // "Invested (AED)", "Amount Invested", "Invested Amount" and the like
+    aliases: { invested: /invest/i },
   }),
 };
 
@@ -260,6 +264,12 @@ export function locateTable(grid: Grid, s: Spec): Table {
     if (!ok) continue;
     for (const [field, h] of Object.entries(s.optionalHeaders ?? {})) {
       const c = nearest(norm(h));
+      if (c >= 0) cols[field] = c;
+    }
+    for (const [field, re] of Object.entries(s.aliases ?? {})) {
+      if (cols[field] !== undefined) continue;
+      const taken = new Set(Object.values(cols));
+      const c = row.findIndex((v, i) => typeof v === 'string' && re.test(v) && !taken.has(i));
       if (c >= 0) cols[field] = c;
     }
 

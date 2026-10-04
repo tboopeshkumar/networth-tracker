@@ -40,4 +40,9 @@ describe('real estate table', () => {
     expect(t.cols).toMatchObject({ invested: 2, valueAed: 3, valueInr: 4 });
     expect(readRows<RowOf<'realEstate'> & { invested: number }>(withInvested, t).map((r) => [r.invested, r.valueAed])).toEqual([[900, 1000], [2300, 2500.5]]);
   });
+
+  it.each(['Invested (AED)', 'Amount Invested', 'Invested Amount', ' invested '])('accepts the header worded as "%s"', (head) => {
+    const worded = grid.map((r, i) => (i < 3 ? r : [r[0], r[1], i === 3 ? head : 500, ...r.slice(2)]));
+    expect(locateTable(worded, SPECS.realEstate).cols).toMatchObject({ invested: 2, valueAed: 3 });
+  });
 });
