@@ -166,7 +166,11 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
       break;
     case 'realEstate':
       name = String(rec.property);
-      fields = [text('property', 'Property', rec.property, { required: true }), text('provider', 'Provider', rec.provider), money('valueAed', 'Value (AED)', rec.valueAed, { aed: true })];
+      fields = [
+        text('property', 'Property', rec.property, { required: true }), text('provider', 'Provider', rec.provider),
+        ...(tbl.cols.invested !== undefined ? [money('invested', 'Invested (AED)', rec.invested, { aed: true })] : []),
+        money('valueAed', 'Value (AED)', rec.valueAed, { aed: true }),
+      ];
       break;
   }
   const title = `Edit ${name}`;
@@ -375,10 +379,12 @@ function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
     }
     case 'realEstate': {
       const rows = model.rows.realEstate;
-      if (!model.tables.realEstate) throw new Error('That table is no longer in the sheet. Refresh and try again.');
+      const tbl = model.tables.realEstate;
+      if (!tbl) throw new Error('That table is no longer in the sheet. Refresh and try again.');
       return simple('realEstate', 'Add property', [
         text('property', 'Property', '', { required: true }),
         text('provider', 'Provider', rows.at(-1)?.provider ?? '', { list: uniq(rows.map((r) => r.provider)) }),
+        ...(tbl.cols.invested !== undefined ? [money('invested', 'Invested (AED)', '', { required: true, aed: true })] : []),
         money('valueAed', 'Value (AED)', '', { required: true, aed: true }),
       ], 'Added at the end of the list; the tab’s total includes it.');
     }

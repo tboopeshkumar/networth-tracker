@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import type { EditRequest, EditableRow } from '../../lib/editors';
 import {
-  fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd,
+  fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd, type Cell,
 } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { BrokerFeed } from '../../lib/brokerFeed';
@@ -269,25 +269,52 @@ export function buildViews(model: Model): View[] {
 /** Fractional property shares, valued in AED: the section's total is shown in rupees like the rest of Investments. */
 function realEstateView(model: Model): View[] {
   if (!model.tables.realEstate) return [];
-  const recs = model.rows.realEstate;
+  // Invested is there once the tab has that column: what was paid, in AED
+  type Property = RowOf<'realEstate'> & { invested?: Cell };
+  const recs = model.rows.realEstate as Property[];
+  const hasInvested = model.tables.realEstate.cols.invested !== undefined;
   const aed = (n: unknown) => (isNum(n) ? `AED ${num(n, 0)}` : '—');
+  const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}AED ${num(Math.abs(n), 0)}`;
+  const pnl = (r: Property) => (isNum(r.invested) && r.invested > 0 && isNum(r.valueAed) ? r.valueAed - r.invested : null);
   const totalAed = sum(recs, 'valueAed');
+  const investedAed = sum(recs, 'invested');
+  const gainAed = totalAed - investedAed;
   const toInr = n0(model.cells.fxAedInr?.value);
-  return [view<RowOf<'realEstate'>>({
+  return [view<Property>({
     id: 'realEstate', group: 'Investments', name: 'Real estate', recs,
     inr: toInr > 0 ? totalAed * toInr : undefined,
     total: toInr > 0 ? <Amount value={totalAed * toInr} /> : aed(totalAed),
+    // What was put in comes first, in the currency it was paid in; the header total is in rupees
+    lead: hasInvested && investedAed > 0 ? (
+      <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
+        <span>Invested <b className="font-semibold tabular-nums">{aed(investedAed)}</b></span>
+        <span className="text-ink-3">worth <b className="font-semibold tabular-nums text-ink">{aed(totalAed)}</b></span>
+        <Pill tone={tone(gainAed)}>{signed(gainAed)} · {signedPct(ret(gainAed, investedAed))}</Pill>
+      </div>
+    ) : undefined,
     edit: editRow('realEstate'), add: { kind: 'add', id: 'realEstate' },
     remove: (r) => ({ kind: 'remove', id: 'realEstate', key: r._key }),
     columns: [
       { head: 'Property', name: true, render: (r) => text(r.property) },
       { head: 'Provider', render: (r) => text(r.provider) },
+      ...(hasInvested ? [{ head: 'Invested (AED)', num: true, render: (r: Property) => aed(r.invested) }] : []),
       { head: 'Value (AED)', num: true, render: (r) => aed(r.valueAed), className: () => 'strong' },
-      ...(toInr > 0 ? [{ head: 'Value (INR)', num: true, render: (r: RowOf<'realEstate'>) => (isNum(r.valueAed) ? inr(r.valueAed * toInr) : '—') }] : []),
+      ...(hasInvested ? [
+        { head: 'P&L (AED)', num: true, render: (r: Property) => (pnl(r) === null ? '—' : signed(pnl(r)!)), className: (r: Property) => tone(pnl(r)) },
+        { head: 'Return', num: true, render: (r: Property) => (pnl(r) === null ? '—' : <Pill tone={tone(pnl(r))}>{signedPct(ret(pnl(r), r.invested))}</Pill>) },
+      ] : []),
+      ...(toInr > 0 ? [{ head: 'Value (INR)', num: true, render: (r: Property) => (isNum(r.valueAed) ? inr(r.valueAed * toInr) : '—') }] : []),
     ],
     card: (r) => ({
       title: text(r.property), value: aed(r.valueAed), sub: text(r.provider),
-      foot: toInr > 0 && isNum(r.valueAed) ? <>≈ <Amount value={r.valueAed * toInr} /></> : undefined,
+      right: pnl(r) === null ? undefined : { text: `${signed(pnl(r)!)} · ${signedPct(ret(pnl(r), r.invested))}`, tone: tone(pnl(r)) },
+      foot: (isNum(r.invested) || toInr > 0) ? (
+        <>
+          {isNum(r.invested) && <>Invested {aed(r.invested)}</>}
+          {isNum(r.invested) && toInr > 0 && isNum(r.valueAed) && ' · '}
+          {toInr > 0 && isNum(r.valueAed) && <>≈ <Amount value={r.valueAed * toInr} /></>}
+        </>
+      ) : undefined,
     }),
   })];
 }

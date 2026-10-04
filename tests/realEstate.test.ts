@@ -32,4 +32,12 @@ describe('real estate table', () => {
     const narrow = grid.map((r) => r.slice(0, 3));
     expect(readRows(narrow, locateTable(narrow, SPECS.realEstate))).toHaveLength(2);
   });
+
+  it('reads an Invested column wherever it sits, and does without one', () => {
+    expect(table.cols.invested).toBeUndefined();
+    const withInvested = grid.map((r, i) => (i < 3 ? r : [r[0], r[1], i === 3 ? 'Invested' : i === 6 ? 3200 : i === 4 ? 900 : 2300, ...r.slice(2)]));
+    const t = locateTable(withInvested, SPECS.realEstate);
+    expect(t.cols).toMatchObject({ invested: 2, valueAed: 3, valueInr: 4 });
+    expect(readRows<RowOf<'realEstate'> & { invested: number }>(withInvested, t).map((r) => [r.invested, r.valueAed])).toEqual([[900, 1000], [2300, 2500.5]]);
+  });
 });

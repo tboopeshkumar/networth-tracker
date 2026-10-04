@@ -129,7 +129,8 @@ export const SPECS = {
   realEstate: spec({
     tab: 'Real Estate', anchor: 'property', key: ['provider', 'property'], end: /^total/i, optional: true,
     headers: { provider: 'Provider', property: 'Property', valueAed: 'Value (AED)' },
-    optionalHeaders: { valueInr: 'Value (INR)' },
+    // Invested is what was paid for the share, in AED like its value
+    optionalHeaders: { invested: 'Invested', valueInr: 'Value (INR)' },
   }),
 };
 
