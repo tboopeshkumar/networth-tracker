@@ -1,9 +1,9 @@
-import { IconDots, IconMoon, IconRefresh, IconSun } from '@tabler/icons-react';
+import { IconDots, IconMoon, IconRefresh, IconReload, IconSun } from '@tabler/icons-react';
 import { useEffect, useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
-import { BUILT, VERSION } from '../hooks/useUpdateCheck';
+import { BUILT, VERSION, reloadApp } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
-import { BTN } from './ui';
+import { BTN, cx } from './ui';
 
 interface Props {
   sheetTitle?: string;
@@ -11,6 +11,8 @@ interface Props {
   canEdit: boolean;
   showActions: boolean;
   demo: boolean;
+  /** a newer build is live: the reload button says so */
+  updateReady?: boolean;
   onRefresh: () => void;
   onSwitchSheet: () => void;
   onDisconnect: () => void;
@@ -24,7 +26,7 @@ const builtAt = new Date(BUILT).toLocaleString('en-IN', { day: 'numeric', month:
 
 const MENU_ITEM = 'cursor-pointer rounded-md px-2.5 py-2 text-left text-[13px] text-ink hover:bg-sunk';
 
-export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefresh, onSwitchSheet, onDisconnect, onSignOut, onExport, onImportCas }: Props) {
+export function Header({ sheetTitle, email, canEdit, showActions, demo, updateReady, onRefresh, onSwitchSheet, onDisconnect, onSignOut, onExport, onImportCas }: Props) {
   const menu = useRef<HTMLDetailsElement>(null);
   const pick = (fn: () => void) => () => {
     if (menu.current) menu.current.open = false;
@@ -68,6 +70,17 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
           <button type="button" className={BTN} title="Reload from the sheet" aria-label="Reload from the sheet" onClick={onRefresh}>
             <IconRefresh size={16} stroke={1.75} aria-hidden="true" />
             <span className="hidden sm:inline">Refresh</span>
+          </button>
+        )}
+        {/* Refresh re-reads the sheet; this reloads the app itself, for a newer version. The dot means one is waiting. */}
+        {showActions && (
+          <button
+            type="button" className={cx(BTN.replace('px-3', 'px-2'), 'relative')} onClick={() => void reloadApp()}
+            title={updateReady ? 'Reload the app: a newer version is available' : 'Reload the app'}
+            aria-label={updateReady ? 'Reload the app: a newer version is available' : 'Reload the app'}
+          >
+            <IconReload size={16} stroke={1.75} aria-hidden="true" />
+            {updateReady && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-page bg-accent" aria-hidden="true" />}
           </button>
         )}
         {/* Always there, so the sign-in screen can switch too */}
