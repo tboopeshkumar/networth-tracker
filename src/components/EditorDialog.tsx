@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { editorFor, type EditRequest, type EditorDef, type Field, type Values } from '../lib/editors';
 import { serialToIso, todaySerial } from '../lib/format';
 import type { Model } from '../lib/model';
 import { AccessError, AuthError, type SheetData } from '../lib/sheets';
 import { ConflictError, type Plan } from '../lib/writer';
+import { Saved } from './Saved';
 import { BTN, BTN_DANGER, BTN_PRIMARY } from './ui';
 
 const HINT = 'mb-3.5 text-[13px] text-ink-2';
@@ -26,12 +27,16 @@ type Failure = { message: string; details: string[] };
 const initialValue = (f: Field) =>
   (f.type === 'date' ? serialToIso(f.value) : f.value === null || f.value === undefined ? '' : String(f.value));
 
-/** Form → review (exact cells, before → after) → write. Nothing is written without the review. */
+/** Form → review (exact cells, before → after) → write → saved. Nothing is written without the review. */
 export function EditorDialog({ request, model, data, sheetTitle, onWrite, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const def = useMemo<EditorDef | Error>(() => {
     try { return editorFor(model, data, request); } catch (e) { return e as Error; }
   }, [model, data, request]);
+
+  // Held here, not in Flow: the write reloads the sheet, and the edited row may no longer exist to edit
+  const [saved, setSaved] = useState<Plan | null>(null);
+  const close = useCallback(() => ref.current?.close(), []);
 
   useEffect(() => {
     const d = ref.current;
@@ -41,9 +46,11 @@ export function EditorDialog({ request, model, data, sheetTitle, onWrite, onClos
   return (
     <dialog ref={ref} className="m-auto w-[min(560px,calc(100vw-20px))] rounded-xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
       <div className="max-h-[calc(100vh-60px)] overflow-y-auto p-5 sm:p-6">
-        {def instanceof Error
-          ? <Problem message={def.message} onClose={() => ref.current?.close()} />
-          : <Flow def={def} sheetTitle={sheetTitle} onWrite={onWrite} onDone={() => ref.current?.close()} />}
+        {saved
+          ? <Saved plan={saved} deleted={request.kind === 'remove'} onDone={close} />
+          : def instanceof Error
+            ? <Problem message={def.message} onClose={close} />
+            : <Flow def={def} sheetTitle={sheetTitle} onWrite={onWrite} onSaved={setSaved} onDone={close} />}
       </div>
     </dialog>
   );
@@ -58,7 +65,7 @@ function Problem({ message, onClose }: { message: string; onClose: () => void })
   );
 }
 
-function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle: string; onWrite: Props['onWrite']; onDone: () => void }) {
+function Flow({ def, sheetTitle, onWrite, onSaved, onDone }: { def: EditorDef; sheetTitle: string; onWrite: Props['onWrite']; onSaved: (plan: Plan) => void; onDone: () => void }) {
   const [vals, setVals] = useState<Values>(() => Object.fromEntries(def.fields.map((f) => [f.name, initialValue(f)])));
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
@@ -96,7 +103,7 @@ function Flow({ def, sheetTitle, onWrite, onDone }: { def: EditorDef; sheetTitle
     setFailure(null);
     try {
       await onWrite(review.plan);
-      onDone();
+      onSaved(review.plan);
     } catch (e) {
       if (e instanceof ConflictError) setFailure({ message: e.message, details: e.details });
       else if (e instanceof AuthError) setFailure({ message: 'Your Google session expired. Close this, sign in again, and retry.', details: [] });

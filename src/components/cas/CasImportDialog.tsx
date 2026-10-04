@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { casHoldings, matchCas, type CasHolding } from '../../lib/cas';
 import { inr, isNum, num } from '../../lib/format';
 import type { Model } from '../../lib/model';
 import { V, planRowEdit, type Edit, type Plan } from '../../lib/writer';
+import { Saved } from '../Saved';
 import { AmcBadge, BTN, BTN_PRIMARY, PANEL, cx } from '../ui';
 import { PasswordNeeded, pdfText } from './pdfText';
 
@@ -25,6 +26,8 @@ export function CasImportDialog({ model, onWrite, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [skip, setSkip] = useState<ReadonlySet<string>>(new Set());
   const [withInvested, setWithInvested] = useState(false);
+  const [saved, setSaved] = useState<Plan | null>(null);
+  const close = useCallback(() => ref.current?.close(), []);
 
   useEffect(() => { const d = ref.current; if (d && !d.open) d.showModal(); }, []);
   const hasUnits = model.tables.mf.cols.units !== undefined;
@@ -70,7 +73,7 @@ export function CasImportDialog({ model, onWrite, onClose }: Props) {
     setError(null);
     try {
       await onWrite(plan);
-      ref.current?.close();
+      setSaved(plan);
     } catch (e) {
       setError(`Nothing was written: ${(e as Error).message}`);
     } finally {
@@ -80,7 +83,8 @@ export function CasImportDialog({ model, onWrite, onClose }: Props) {
 
   return (
     <dialog ref={ref} className="m-auto w-[min(640px,calc(100vw-20px))] rounded-xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(0,0,0,0.3)]" onClose={onClose}>
-      <div className="max-h-[calc(100vh-60px)] overflow-y-auto p-5 sm:p-6">
+      {saved && <div className="p-5 sm:p-6"><Saved plan={saved} onDone={close} /></div>}
+      <div className={cx('max-h-[calc(100vh-60px)] overflow-y-auto p-5 sm:p-6', saved && 'hidden')}>
         <h3 className="mb-1.5 text-base font-semibold">Import from CAS</h3>
         <p className="mb-3.5 text-[13px] text-ink-2">
           Pick your MF Central <b className="font-semibold">Consolidated Account Summary</b> PDF. It's read on this device, nothing is

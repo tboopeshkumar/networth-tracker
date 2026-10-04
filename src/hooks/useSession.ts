@@ -149,9 +149,9 @@ export function useSession(toast: Toast) {
     if (!session) throw new Error('Nothing is loaded');
     await execute(session.backend, plan);
     const loaded = await loadAll(session.backend);
+    // No toast: the dialog that wrote it shows the confirmation itself
     setSession((s) => (s ? { ...s, loaded } : s));
-    toast('Saved to your sheet');
-  }, [session, toast]);
+  }, [session]);
 
   const switchSheet = useCallback(() => {
     if (!identity) return;
