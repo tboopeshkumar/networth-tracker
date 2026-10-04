@@ -369,6 +369,34 @@ withFixture('NPS scheme holdings are listed, linked from Net Worth and edited by
   if (line) assert.equal(makeLinker(plain.model)(plain.model.rows.networth.find((r) => r._key === line._key)!), null);
 });
 
+withFixture('editing a typed metal value records the date it was set, adding the row the first time', async () => {
+  const demo = new DemoSheets(fixture());
+  const first = await loadAll(demo);
+  for (const [id, path] of [['goldUae', 'summaries.goldUae.currentAed'], ['silverUae', 'summaries.silverUae.sellPrice']] as const) {
+    const S = first.model.summaries[id];
+    const ref = id === 'goldUae' ? S?.currentAed : S?.sellPrice;
+    if (!S || !ref || S.asOf?.value) continue; // a sheet that already has the date is covered below
+    assert.ok(S.asOfLabel, 'no date row yet: the app knows where one goes');
+
+    const edit = editorFor(first.model, first.data, { kind: 'cell', path });
+    assert.deepEqual(edit.fields.map((x) => x.name), ['v', 'asOf']);
+    assert.throws(() => edit.build({ v: String(ref.value), asOf: '' }), /Nothing changed/);
+    const { plan } = edit.build({ v: String(n0(ref.value) + 1), asOf: '2026-01-15' });
+    assert.deepEqual(plan.changes.map((c) => c.where).slice(1), ['New row', 'Valued on']);
+    const { requests } = await execute(demo, plan);
+    assert.equal(requests.filter((r) => 'updateCells' in r && r.updateCells.fields.includes('numberFormat')).length, 1, 'the new date cell is formatted as a date');
+
+    // Next load finds the row by its label; a later edit rewrites the date in place
+    const again = await loadAll(demo);
+    const T = again.model.summaries[id]!;
+    assert.equal(T.asOfLabel, undefined);
+    assert.equal(T.asOf?.row, S.asOf?.row);
+    assert.ok(T.asOf?.value, 'date read back');
+    const later = editorFor(again.model, again.data, { kind: 'cell', path }).build({ v: String(n0(ref.value) + 1), asOf: '2026-02-20' });
+    assert.deepEqual(later.plan.changes.map((c) => c.where), ['Valued on'], 'only the date changes');
+  }
+});
+
 withFixture('deleting a bank account moves only its own table, and nothing below it', async () => {
   const demo = new DemoSheets(fixture());
   const { model, data } = await loadAll(demo);

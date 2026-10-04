@@ -1,5 +1,5 @@
 import type { CellPath } from '../../lib/editors';
-import { fmtDate, fmtDay, inr, num } from '../../lib/format';
+import { fmtDate, fmtDay, inr, isNum, num } from '../../lib/format';
 import type { Model } from '../../lib/model';
 import { feedRateFor } from '../../lib/ratesFeed';
 import { Card, EditButton, Label, PANEL, cx, type OnEdit } from '../ui';
@@ -29,8 +29,15 @@ export function RatesInputs({ model, canEdit, onEdit }: { model: Model; canEdit:
       ? { label: 'NPS gain', value: inr(C.npsGain.value), note: `From NAVs · ${fmtDay(C.npsAsOf?.value)}`, live: true, path: 'cells.npsGain', readOnly: true }
       : { label: 'NPS gain', value: inr(C.npsGain.value), note: 'Unrealised', path: 'cells.npsGain' });
   }
-  if (S.goldUae) tiles.push({ label: 'Gold (UAE) value', value: `AED ${num(S.goldUae.currentAed.value)}`, note: `${num(S.goldUae.qty.value)} g held`, path: 'summaries.goldUae.currentAed' });
-  if (S.silverUae?.sellPrice) tiles.push({ label: 'Silver sell price', value: `AED ${num(S.silverUae.sellPrice.value)}`, note: `per oz · ${num(S.silverUae.qty.value)} oz held`, path: 'summaries.silverUae.sellPrice' });
+  // Typed valuations: say when each was last set, once the sheet has that date
+  const dated = (v: unknown, rest: string, undated: string) => (isNum(v) ? `As of ${fmtDay(v)} · ${rest}` : undated);
+  if (S.goldUae) {
+    const g = `${num(S.goldUae.qty.value)} g`;
+    tiles.push({ label: 'Gold (UAE) value', value: `AED ${num(S.goldUae.currentAed.value)}`, note: dated(S.goldUae.asOf?.value, g, `${g} held`), path: 'summaries.goldUae.currentAed' });
+  }
+  if (S.silverUae?.sellPrice) {
+    tiles.push({ label: 'Silver sell price', value: `AED ${num(S.silverUae.sellPrice.value)}`, note: dated(S.silverUae.asOf?.value, 'per oz', `per oz · ${num(S.silverUae.qty.value)} oz held`), path: 'summaries.silverUae.sellPrice' });
+  }
 
   if (!tiles.length) return null;
   return (

@@ -2,7 +2,7 @@
 // Pure: the dialog component renders these and never builds plans itself.
 
 import { a1, fmtDate, inr, isNum, isoToSerial, num, todaySerial, type Cell } from './format';
-import { isFormula, type Model, type Row, type SpecId } from './model';
+import { AS_OF_LABEL, isFormula, type Model, type Row, type SpecId, type SummaryId } from './model';
 import type { SheetData } from './sheets';
 import {
   V, planCellEdit, planInsert, planMetalPurchase, planRemove, planRowEdit,
@@ -235,6 +235,40 @@ function cellEditor(model: Model, path: CellPath): EditorDef {
     };
   };
 
+  /**
+   * A typed valuation with the date it was set. The date lives in a "Valued on"
+   * row of the metal's summary block; a sheet without one gets the row added.
+   */
+  const valued = (id: SummaryId, field: Field, title: string, hint?: string): EditorDef => {
+    const S = model.summaries[id];
+    const asOf = S?.asOf;
+    const when = date('asOf', AS_OF_LABEL, isNum(asOf?.value) ? asOf.value : todaySerial());
+    return {
+      title, hint,
+      fields: asOf ? [{ ...field, bumps: 'asOf' }, when] : [field],
+      build(vals) {
+        const v = cellValue(field, vals[field.name]);
+        if (!v) throw new Error('Enter a value.');
+        const changed = !!ref.formula || !('number' in v && isNum(ref.value) && Math.abs(v.number - ref.value) < 0.005);
+        const d = asOf ? cellValue(when, vals.asOf) : null;
+        const dated = d && 'number' in d && d.number !== asOf?.value ? d : null;
+        if (!changed && !dated) throw new Error('Nothing changed.');
+        const plan: Plan = changed
+          ? planCellEdit(parts, ref, v, display(field, v), title, before(field, ref.formula ?? ref.value))
+          : { title, changes: [], ops: [] };
+        if (S && asOf && dated) {
+          if (S.asOfLabel) {
+            plan.changes.push({ where: 'New row', a1: a1(asOf.tab, asOf.row ?? 0, S.asOfLabel.col), before: '—', after: AS_OF_LABEL });
+            plan.ops.push({ type: 'set', where: `${asOf.tab} › ${AS_OF_LABEL} label`, target: { kind: 'cell', path: ['summaries', id, 'asOfLabel'] }, expect: S.asOfLabel.value, value: V.string(AS_OF_LABEL) });
+          }
+          plan.changes.push({ where: AS_OF_LABEL, a1: a1(asOf.tab, asOf.row ?? 0, asOf.col), before: isNum(asOf.value) ? fmtDate(asOf.value) : '—', after: fmtDate(dated.number) });
+          plan.ops.push({ type: 'set', where: `${asOf.tab} › ${AS_OF_LABEL}`, target: { kind: 'cell', path: ['summaries', id, 'asOf'] }, expect: asOf.value, value: dated, date: true });
+        }
+        return { plan, warn: changed ? replaces : [] };
+      },
+    };
+  };
+
   switch (path) {
     case 'cells.fxAedInr': {
       const rate = number('rate', 'AED → INR rate', ref.value, { showIf: 'typed' });
@@ -263,9 +297,9 @@ function cellEditor(model: Model, path: CellPath): EditorDef {
     case 'cells.npsGain':
       return withAsOf(money('v', 'NPS gain (₹)', ref.value), 'NPS gain');
     case 'summaries.goldUae.currentAed':
-      return single(money('v', 'Current value (AED)', ref.value, { aed: true }), 'Gold (UAE) current value', `You hold ${num(model.summaries.goldUae?.qty.value)} g.`);
+      return valued('goldUae', money('v', 'Current value (AED)', ref.value, { aed: true }), 'Gold (UAE) current value', `You hold ${num(model.summaries.goldUae?.qty.value)} g.`);
     case 'summaries.silverUae.sellPrice':
-      return single(number('v', 'Sell price (AED per oz)', ref.value), 'Silver sell price', `Current value is calculated from this × ${num(model.summaries.silverUae?.qty.value)} oz.`);
+      return valued('silverUae', number('v', 'Sell price (AED per oz)', ref.value), 'Silver sell price', `Current value is calculated from this × ${num(model.summaries.silverUae?.qty.value)} oz.`);
   }
 }
 

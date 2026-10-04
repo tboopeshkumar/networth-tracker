@@ -59,6 +59,8 @@ export interface SetOp {
   target: Target;
   expect: Cell | undefined;
   value: CellValue | ((ctx: ExecContext) => CellValue);
+  /** also format the cell as a date: for a date cell the app creates, which has no format of its own yet */
+  date?: boolean;
 }
 
 export interface InsertOp {
@@ -138,11 +140,11 @@ function resolve(model: Model, target: Target): Resolved | null {
   return { tab: ref.tab, row: ref.row, col: ref.col, value: ref.value };
 }
 
-const cellReq = (sheetId: number, rowIndex: number, columnIndex: number, v: CellValue): BatchRequest => ({
+const cellReq = (sheetId: number, rowIndex: number, columnIndex: number, v: CellValue, date = false): BatchRequest => ({
   updateCells: {
     start: { sheetId, rowIndex, columnIndex },
-    rows: [{ values: [{ userEnteredValue: toEntered(v) }] }],
-    fields: 'userEnteredValue',
+    rows: [{ values: [{ userEnteredValue: toEntered(v), ...(date ? { userEnteredFormat: { numberFormat: { type: 'DATE' as const, pattern: 'd-mmm-yyyy' } } } : {}) }] }],
+    fields: date ? 'userEnteredValue,userEnteredFormat.numberFormat' : 'userEnteredValue',
   },
 });
 
@@ -240,7 +242,7 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
     const moved = !!shifted && insertAt !== null && s.at.tab === insertTable?.spec.tab && s.at.row >= insertAt
       && s.at.col >= shifted.from && s.at.col < shifted.to;
     const value = typeof s.value === 'function' ? s.value({ insertAt, model }) : s.value;
-    requests.push(cellReq(sheetId(s.at.tab), moved ? s.at.row + 1 : s.at.row, s.at.col, value));
+    requests.push(cellReq(sheetId(s.at.tab), moved ? s.at.row + 1 : s.at.row, s.at.col, value, s.date));
   }
 
   await backend.batchUpdate(requests);

@@ -23,7 +23,8 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
   const dates = [...R.mf.map((r) => r.navDate), ...R.equity.map((r) => r.navDate), ...R.sgb.map((r) => r.valueDate)].filter(isNum);
   if (dates.length) {
     const newest = Math.max(...dates);
-    const age = todaySerial() - newest;
+    // A date can carry a time of day (a feed's timestamp): count whole days
+    const age = Math.floor(todaySerial() - newest);
     if (age > 10) {
       out.push({
         id: 'stale',

@@ -191,6 +191,10 @@ export interface Summary {
   qty: CellRef;
   currentAed: CellRef;
   sellPrice?: CellRef;
+  /** when the typed value was last set: a "Valued on" row in the block, or where the app will add one */
+  asOf?: CellRef;
+  /** the label cell for that row, only while the row doesn't exist yet */
+  asOfLabel?: CellRef;
 }
 
 export interface Ledger {
@@ -203,6 +207,10 @@ export interface Ledger {
   recorded: Cell;
   recordedFormula: boolean;
 }
+
+/** The row in a metal's summary block that dates its typed value. */
+export const AS_OF_LABEL = 'Valued on';
+const AS_OF = /^(valued on|as of|updated|last updated)\b/i;
 
 export type CellId = 'fxAedInr' | 'fxUsdAed' | 'npsInvested' | 'npsGain' | 'npsAsOf';
 export type SummaryId = 'goldUae' | 'silverUae';
@@ -424,18 +432,26 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     const inv = rowOf(/^invested$/i);
     const cur = rowOf(/^current value$/i);
     const sell = rowOf(/sell price/i);
+    // The date sits in the AED column of its own row. A sheet without one gets it on the
+    // first empty row under the block, the first time a value is edited from the app.
+    const dated = rowOf(AS_OF);
+    let free = head.row;
+    for (let r = head.row; r < g.length; r++) if ((g[r] ?? []).some((v) => !blank(v))) free = r + 1;
     summaries[id] = {
       tab,
       investedAed: { tab, row: inv, col: aed, label: 'Invested (AED)' },
       qty: { tab, row: inv, col: colOf('Qty'), label: 'Quantity' },
       currentAed: { tab, row: cur, col: aed, label: 'Current value (AED)' },
       ...(sell !== null ? { sellPrice: { tab, row: sell, col: aed, label: String(g[sell][1] ?? 'Sell price') } } : {}),
+      ...(aed < 0 ? {} : dated !== null
+        ? { asOf: { tab, row: dated, col: aed, label: AS_OF_LABEL } }
+        : { asOf: { tab, row: free, col: aed, label: AS_OF_LABEL }, asOfLabel: { tab, row: free, col: head.col, label: AS_OF_LABEL } }),
     };
   }
 
   const refs = [
     ...Object.values(cells),
-    ...Object.values(summaries).flatMap((s) => [s.investedAed, s.qty, s.currentAed, s.sellPrice].filter((x): x is CellRef => !!x)),
+    ...Object.values(summaries).flatMap((s) => [s.investedAed, s.qty, s.currentAed, s.sellPrice, s.asOf, s.asOfLabel].filter((x): x is CellRef => !!x)),
   ];
   for (const c of refs) {
     c.value = cellAt(values[c.tab], c.row, c.col);

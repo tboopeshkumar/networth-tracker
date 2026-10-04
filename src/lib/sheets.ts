@@ -12,7 +12,13 @@ export interface UserEnteredValue { numberValue?: number; stringValue?: string; 
 export type BatchRequest =
   | { insertDimension: { range: { sheetId: number; dimension: 'ROWS'; startIndex: number; endIndex: number }; inheritFromBefore: boolean } }
   | { copyPaste: { source: GridRange; destination: GridRange; pasteType: 'PASTE_NORMAL' } }
-  | { updateCells: { start: { sheetId: number; rowIndex: number; columnIndex: number }; rows: { values: { userEnteredValue?: UserEnteredValue }[] }[]; fields: 'userEnteredValue' } }
+  | {
+    updateCells: {
+      start: { sheetId: number; rowIndex: number; columnIndex: number };
+      rows: { values: { userEnteredValue?: UserEnteredValue; userEnteredFormat?: { numberFormat: { type: 'DATE'; pattern: string } } }[] }[];
+      fields: 'userEnteredValue' | 'userEnteredValue,userEnteredFormat.numberFormat';
+    };
+  }
   | { deleteRange: { range: GridRange; shiftDimension: 'ROWS' } }
   | { insertRange: { range: GridRange; shiftDimension: 'ROWS' } };
 
