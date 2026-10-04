@@ -30,7 +30,7 @@ const AMCS: [RegExp, Amc][] = [
   [/nippon|reliance/i, { name: 'Nippon India', initials: 'NI', color: '#d7282f', logo: 'nippon' }],
   [/parag parikh|ppfas/i, { name: 'PPFAS', initials: 'PP', color: '#0f4c81', logo: 'ppfas' }],
   [/\bquant\b/i, { name: 'Quant', initials: 'QU', color: '#6d28d9' }],
-  [/\bsbi\b/i, { name: 'SBI', initials: 'SB', color: '#1b4f9c' }],
+  [/\bsbi\b/i, { name: 'SBI', initials: 'SB', color: '#1b4f9c', logo: 'sbi' }],
   [/sundaram/i, { name: 'Sundaram', initials: 'SU', color: '#0b6e4f' }],
   [/\btata\b/i, { name: 'Tata', initials: 'TA', color: '#486aae' }],
   [/\buti\b/i, { name: 'UTI', initials: 'UT', color: '#1a4fa0', logo: 'uti' }],

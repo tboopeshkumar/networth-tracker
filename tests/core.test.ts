@@ -274,7 +274,8 @@ test('every fund house logo the app refers to is in public/amc', () => {
     const logo = amcOf(`${h} Example Fund`).logo;
     if (logo) assert.ok(existsSync(new URL(`../public/amc/${logo}.png`, import.meta.url)), `${h}: public/amc/${logo}.png`);
   }
-  assert.equal(amcOf('SBI Example Fund').logo, undefined, 'houses without a usable icon keep the monogram');
+  assert.equal(amcOf('SBI Pension Fund Scheme C').logo, 'sbi', 'NPS fund managers get their house logo too');
+  assert.equal(amcOf('Tata Example Fund').logo, undefined, 'houses without a usable icon keep the monogram');
 });
 
 withFixture('every mutual fund in the sheet maps to a known fund house', () => {
