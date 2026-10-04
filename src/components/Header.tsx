@@ -1,5 +1,5 @@
 import { IconDots, IconMoon, IconRefresh, IconSun } from '@tabler/icons-react';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { BUILT, VERSION } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
@@ -30,6 +30,22 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, onRefres
     if (menu.current) menu.current.open = false;
     fn();
   };
+  // The menu closes as soon as you tap, scroll or press Escape anywhere outside it
+  useEffect(() => {
+    const close = (e: Event) => {
+      const m = menu.current;
+      if (!m?.open) return;
+      if (e.type === 'keydown' ? (e as KeyboardEvent).key === 'Escape' : !m.contains(e.target as Node)) m.open = false;
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    window.addEventListener('scroll', close, { passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+      window.removeEventListener('scroll', close);
+    };
+  }, []);
   const account = demo ? 'demo mode' : email;
   const { theme, chosen, choose } = useTheme();
   const next = theme === 'dark' ? 'light' : 'dark';
