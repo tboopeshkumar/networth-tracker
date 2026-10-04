@@ -22,8 +22,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
   const linkOf = useMemo(() => makeLinker(model), [model]);
   const trend = model.rows.trend;
 
-  // Holdings sections: which are open survives edits and reloads
-  const [open, setOpen] = useState<ReadonlySet<ViewId>>(() => new Set(['mf']));
+  // Holdings sections start closed; which are open survives edits and refreshes
+  const [open, setOpen] = useState<ReadonlySet<ViewId>>(() => new Set());
   const [flash, setFlash] = useState<ViewId | null>(null);
   const [scrollTo, setScrollTo] = useState<ViewId | null>(null);
   const sections = useRef(new Map<ViewId, HTMLDetailsElement>());
