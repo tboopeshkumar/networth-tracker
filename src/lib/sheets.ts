@@ -11,6 +11,7 @@ export interface UserEnteredValue { numberValue?: number; stringValue?: string; 
 /** The subset of spreadsheets.batchUpdate requests this app sends. */
 export type BatchRequest =
   | { insertDimension: { range: { sheetId: number; dimension: 'ROWS'; startIndex: number; endIndex: number }; inheritFromBefore: boolean } }
+  | { deleteDimension: { range: { sheetId: number; dimension: 'ROWS'; startIndex: number; endIndex: number } } }
   | { copyPaste: { source: GridRange; destination: GridRange; pasteType: 'PASTE_NORMAL' } }
   | {
     updateCells: {

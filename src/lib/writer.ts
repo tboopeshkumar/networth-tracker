@@ -7,7 +7,7 @@
 // ONE spreadsheets.batchUpdate, which Google applies atomically.
 
 import { a1, colLetter, isNum, n0, type Cell } from './format';
-import { OPTIONAL_TABS, TABS, buildModel, detailSheets, type Model, type Row, type SpecId } from './model';
+import { OPTIONAL_TABS, TABS, buildModel, detailSheets, rowsOf, tableOf, type Model, type Row, type TableId } from './model';
 import type { BatchRequest, SheetData, SheetMeta, SheetsBackend, UserEnteredValue } from './sheets';
 
 export class ConflictError extends Error {
@@ -46,10 +46,10 @@ const fmtRaw = (v: unknown) =>
 /* ---------- plans ---------- */
 
 export type Target =
-  | { kind: 'row'; id: SpecId; key: string; field: string }
+  | { kind: 'row'; id: TableId; key: string; field: string }
   | { kind: 'cell'; path: string[] }
   /** a table's total row, in the given field's column */
-  | { kind: 'total'; id: SpecId; field: string };
+  | { kind: 'total'; id: TableId; field: string };
 
 export interface ExecContext { insertAt: number | null; model: Model }
 
@@ -65,20 +65,21 @@ export interface SetOp {
 
 export interface InsertOp {
   type: 'insertRow';
-  id: SpecId;
+  id: TableId;
   cells: Record<string, CellValue>;
   expectLastKey?: string;
 }
 
 /**
- * Remove one row of a table: its cells shift up within the table's columns
- * only (other tables side by side are untouched), then a blank row of cells
- * is inserted above the table's end so everything below returns to where it
- * was. Sheets re-points references on both steps, so they end up unchanged.
+ * Remove one row of a table. A table with the tab's rows to itself loses the
+ * whole sheet row, the reverse of how a row is added to it. One that shares
+ * its rows with a table beside it has its cells shift up within its own
+ * columns only, then a blank row of cells inserted above its end so everything
+ * below returns to where it was. Sheets re-points references either way.
  */
 export interface RemoveOp {
   type: 'removeRow';
-  id: SpecId;
+  id: TableId;
   key: string;
   /** keys from the removed row to the table's end, as the user saw them */
   expectKeys: string[];
@@ -123,14 +124,14 @@ interface Resolved { tab: string; row: number; col: number; value: Cell | undefi
 
 function resolve(model: Model, target: Target): Resolved | null {
   if (target.kind === 'total') {
-    const tbl = model.tables[target.id];
+    const tbl = tableOf(model, target.id);
     if (!tbl || tbl.totalRow === null) return null;
     // Only ever rewritten alongside an insert, which already checks the table is as the user saw it
     return { tab: tbl.spec.tab, row: tbl.totalRow, col: tbl.cols[target.field], value: undefined };
   }
   if (target.kind === 'row') {
-    const rec = (model.rows[target.id] as Row[]).find((r) => r._key === target.key);
-    const tbl = model.tables[target.id];
+    const rec = rowsOf(model, target.id).find((r) => r._key === target.key);
+    const tbl = tableOf(model, target.id);
     if (!rec || !tbl) return null;
     return { tab: tbl.spec.tab, row: rec._row, col: tbl.cols[target.field], value: rec[target.field] };
   }
@@ -170,12 +171,12 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   }
 
   const insert = plan.ops.find((o): o is InsertOp => o.type === 'insertRow');
-  const insertTable = insert ? model.tables[insert.id] : null;
+  const insertTable = insert ? tableOf(model, insert.id) : null;
   if (insert) {
     if (!insertTable) {
       problems.push('That section is no longer in the sheet');
     } else if (insert.expectLastKey) {
-      const last = (model.rows[insert.id] as Row[]).at(-1);
+      const last = rowsOf(model, insert.id).at(-1);
       if (last?._key !== insert.expectLastKey) problems.push(`${insertTable.spec.tab}: rows were added or removed since you loaded it`);
     }
   }
@@ -188,9 +189,13 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   const requests: BatchRequest[] = [];
   if (remove && removeAt) {
     const sid = sheetId(removeAt.tab);
-    const cols = { startColumnIndex: removeAt.minCol, endColumnIndex: removeAt.maxCol + 1 };
-    requests.push({ deleteRange: { range: { sheetId: sid, startRowIndex: removeAt.row, endRowIndex: removeAt.row + 1, ...cols }, shiftDimension: 'ROWS' } });
-    requests.push({ insertRange: { range: { sheetId: sid, startRowIndex: removeAt.lastRow, endRowIndex: removeAt.lastRow + 1, ...cols }, shiftDimension: 'ROWS' } });
+    if (removeAt.sideBySide) {
+      const cols = { startColumnIndex: removeAt.minCol, endColumnIndex: removeAt.maxCol + 1 };
+      requests.push({ deleteRange: { range: { sheetId: sid, startRowIndex: removeAt.row, endRowIndex: removeAt.row + 1, ...cols }, shiftDimension: 'ROWS' } });
+      requests.push({ insertRange: { range: { sheetId: sid, startRowIndex: removeAt.lastRow, endRowIndex: removeAt.lastRow + 1, ...cols }, shiftDimension: 'ROWS' } });
+    } else {
+      requests.push({ deleteDimension: { range: { sheetId: sid, dimension: 'ROWS', startIndex: removeAt.row, endIndex: removeAt.row + 1 } } });
+    }
     await backend.batchUpdate(requests);
     return { requests };
   }
@@ -210,7 +215,7 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
     const nextF = data.formulas[tab][insertAt] ?? [];
     // A blank row just below the table (left by a delete) is reused rather than pushing everything down
     const reuse = scoped && insertAt !== insertTable.totalRow
-      && Array.from({ length: width - from }, (_, i) => nextF[from + i]).every((v) => v === '' || v === undefined);
+      && Array.from({ length: width - from }, (_, i) => nextF[from + i]).every((v) => v === '' || v === undefined || v === null);
 
     if (scoped && !reuse) {
       requests.push({ insertRange: { range: { ...span, startRowIndex: insertAt, endRowIndex: insertAt + 1 }, shiftDimension: 'ROWS' } });
@@ -251,8 +256,8 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
 
 /** Where a removal lands now, or why it can't: the rows from it to the table's end must be as the user saw them. */
 function locateRemoval(model: Model, op: RemoveOp, problems: string[]) {
-  const tbl = model.tables[op.id];
-  const rows = model.rows[op.id] as Row[];
+  const tbl = tableOf(model, op.id);
+  const rows = rowsOf(model, op.id);
   const i = rows.findIndex((r) => r._key === op.key);
   if (!tbl || i < 0) { problems.push('That row is no longer in the sheet'); return null; }
   const now = rows.slice(i).map((r) => r._key);
@@ -260,16 +265,16 @@ function locateRemoval(model: Model, op: RemoveOp, problems: string[]) {
     problems.push(`${tbl.spec.tab}: rows were added, removed or changed below it since you loaded it`);
     return null;
   }
-  return { tab: tbl.spec.tab, row: rows[i]._row, lastRow: tbl.lastRow, minCol: tbl.minCol, maxCol: tbl.maxCol };
+  return { tab: tbl.spec.tab, row: rows[i]._row, lastRow: tbl.lastRow, minCol: tbl.minCol, maxCol: tbl.maxCol, sideBySide: !!tbl.spec.sideBySide };
 }
 
 /* ---------- plan builders ---------- */
 
 /** Remove a table row; the review lists each of its cells as removed. */
-export function planRemove(model: Model, id: SpecId, rec: Row, title: string): Plan {
-  const tbl = model.tables[id]!;
+export function planRemove(model: Model, id: TableId, rec: Row, title: string): Plan {
+  const tbl = tableOf(model, id)!;
   const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
-  const rows = model.rows[id] as Row[];
+  const rows = rowsOf(model, id);
   const at = rows.findIndex((r) => r._key === rec._key);
   return {
     title,
@@ -284,8 +289,8 @@ export function planRemove(model: Model, id: SpecId, rec: Row, title: string): P
 export interface Edit { value: CellValue; display: string; before?: string; label?: string }
 
 /** Update fields of an existing table row. */
-export function planRowEdit(model: Model, id: SpecId, rec: Row, edits: Record<string, Edit>, title: string): Plan {
-  const tbl = model.tables[id]!;
+export function planRowEdit(model: Model, id: TableId, rec: Row, edits: Record<string, Edit>, title: string): Plan {
+  const tbl = tableOf(model, id)!;
   const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
   return {
     title,
@@ -318,12 +323,12 @@ export function planCellEdit(path: string[], ref: CellRefLike, value: CellValue,
 
 /** Append a row to a table, directly under its last row. */
 export function planInsert(
-  model: Model, id: SpecId, cells: Record<string, CellValue>, display: Record<string, string>, title: string,
+  model: Model, id: TableId, cells: Record<string, CellValue>, display: Record<string, string>, title: string,
   extra: { ops?: SetOp[]; changes?: Change[] } = {},
 ): Plan {
-  const tbl = model.tables[id]!;
+  const tbl = tableOf(model, id)!;
   const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
-  const last = (model.rows[id] as Row[]).at(-1);
+  const last = rowsOf(model, id).at(-1);
   const newRow = tbl.lastRow + 1;
   return {
     title,

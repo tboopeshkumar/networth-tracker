@@ -223,6 +223,8 @@ export function buildViews(model: Model): View[] {
     const notes = (r: Row) => join(r.note, r.detail, r.interest);
     views.push(view({
       id: `ledger:${L.sheet}`, group: 'Money lent', name: L.title, recs: L.rows, inr: n0(L.balance), total: <Amount value={L.balance} />, ledger: L,
+      add: { kind: 'add', id: `ledger:${L.sheet}` },
+      remove: (r) => ({ kind: 'remove', id: `ledger:${L.sheet}`, key: r._key }),
       columns: [
         { head: 'Date', render: (r) => fmtDate(r.date) },
         { head: 'Description', name: true, render: (r) => text(r.description) },

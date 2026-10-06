@@ -398,6 +398,43 @@ withFixture('editing a typed metal value records the date it was set, adding the
   }
 });
 
+withFixture('ledger entries can be added and deleted, and a delete takes its whole row', async () => {
+  const demo = new DemoSheets(fixture());
+  const first = await loadAll(demo);
+  for (const L of Object.values(first.model.ledgers)) {
+    const id = `ledger:${L.sheet}` as const;
+    const height = demo.f.values[L.sheet].length;
+
+    // Add: the form offers this ledger's own note columns, and the entry lands last, above the balance
+    const { model, data } = await loadAll(demo);
+    const add = editorFor(model, data, { kind: 'add', id });
+    const names = add.fields.map((x) => x.name);
+    assert.deepEqual(names.slice(0, 3), ['description', 'date', 'amount']);
+    assert.deepEqual(names.slice(3), Object.keys(L.table.spec.optionalHeaders ?? {}).filter((f) => L.table.cols[f] !== undefined));
+    assert.throws(() => add.build({ description: '', date: '2026-01-15', amount: '5' }), /Description is required/);
+    await execute(demo, add.build({ description: 'Test entry', date: '2026-01-15', amount: '-250' }).plan);
+
+    const after = (await loadAll(demo)).model;
+    const M = after.ledgers[L.sheet];
+    assert.equal(M.rows.length, L.rows.length + 1);
+    assert.deepEqual([M.rows.at(-1)!.description, M.rows.at(-1)!.amount], ['Test entry', -250]);
+    assert.equal(M.table.totalRow, n0(L.table.totalRow) + 1, 'the balance row is still below the entries');
+
+    // Delete it again: the row goes, nothing is left blank in its place
+    const again = await loadAll(demo);
+    const rec = again.model.ledgers[L.sheet].rows.at(-1)!;
+    const del = editorFor(again.model, again.data, { kind: 'remove', id, key: rec._key });
+    assert.equal(del.danger, true);
+    const { requests } = await execute(demo, del.build({}).plan);
+    assert.deepEqual(requests.map((r) => Object.keys(r)[0]), ['deleteDimension']);
+
+    const back = (await loadAll(demo)).model.ledgers[L.sheet];
+    assert.deepEqual(back.rows.map((r) => r._key), L.rows.map((r) => r._key), 'the ledger is as it was');
+    assert.equal(back.table.totalRow, L.table.totalRow);
+    assert.equal(demo.f.values[L.sheet].length, height);
+  }
+});
+
 withFixture('deleting a bank account moves only its own table, and nothing below it', async () => {
   const demo = new DemoSheets(fixture());
   const { model, data } = await loadAll(demo);

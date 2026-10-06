@@ -2,7 +2,10 @@
 // Pure: the dialog component renders these and never builds plans itself.
 
 import { a1, fmtDate, inr, isNum, isoToSerial, num, todaySerial, type Cell } from './format';
-import { AS_OF_LABEL, isFormula, type Model, type Row, type SpecId, type SummaryId } from './model';
+import {
+  AS_OF_LABEL, isFormula, isLedgerId, rowsOf, tableOf,
+  type LedgerId, type Model, type Row, type SpecId, type SummaryId, type TableId,
+} from './model';
 import type { SheetData } from './sheets';
 import {
   V, planCellEdit, planInsert, planMetalPurchase, planRemove, planRowEdit,
@@ -40,9 +43,9 @@ export type CellPath =
 export type EditRequest =
   | { kind: 'row'; id: EditableRow; key: string }
   | { kind: 'cell'; path: CellPath }
-  | { kind: 'add'; id: AddableId }
+  | { kind: 'add'; id: AddableId | LedgerId }
   | { kind: 'link'; sheet: string }
-  | { kind: 'remove'; id: RemovableRow; key: string };
+  | { kind: 'remove'; id: RemovableRow | LedgerId; key: string };
 
 /** Rows the app offers to delete: plain lists with nothing hanging off them. */
 export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
@@ -310,8 +313,8 @@ function cellEditor(model: Model, path: CellPath): EditorDef {
  * range, so rewrite it to run from the first row through the new one.
  * Totals written any other way (INDIRECT, custom) are left alone.
  */
-function totalCovering(model: Model, data: SheetData, id: SpecId, field: string): { ops?: SetOp[]; changes?: Change[] } {
-  const tbl = model.tables[id];
+function totalCovering(model: Model, data: SheetData, id: TableId, field: string): { ops?: SetOp[]; changes?: Change[] } {
+  const tbl = tableOf(model, id);
   if (!tbl || tbl.totalRow === null) return {};
   const col = tbl.cols[field];
   const f = data.formulas[tbl.spec.tab]?.[tbl.totalRow]?.[col];
@@ -328,7 +331,7 @@ function totalCovering(model: Model, data: SheetData, id: SpecId, field: string)
   };
 }
 
-function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
+function addEditor(model: Model, data: SheetData, id: AddableId | LedgerId): EditorDef {
   const today = todaySerial();
   const holders = uniq([...model.rows.mf, ...model.rows.fd, ...model.rows.sgb, ...model.rows.networth].map((r) => r.holder))
     .filter((h) => h.length < 30);
@@ -358,6 +361,28 @@ function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
       return { plan: planInsert(model, tableId, cells, shown, title), warn: [] };
     },
   });
+
+  // A family-loan ledger: one dated entry, plus whichever note columns that ledger keeps
+  if (isLedgerId(id)) {
+    const tbl = tableOf(model, id);
+    const L = model.ledgers[id.slice('ledger:'.length)];
+    if (!tbl || !L) throw new Error('That ledger is no longer in the sheet. Refresh and try again.');
+    const fields = [
+      text('description', 'Description', '', { required: true }),
+      date('date', 'Date', today),
+      money('amount', 'Amount (₹)', '', { required: true, hint: 'Money you gave is a plain amount. For money returned to you, put a minus in front.' }),
+      ...Object.entries(tbl.spec.optionalHeaders ?? {}).filter(([f]) => tbl.cols[f] !== undefined).map(([f, label]) => text(f, label, '')),
+    ];
+    const title = `Add to ${L.title}`;
+    return {
+      title, fields,
+      hint: 'Added at the end of the ledger. Its Net Balance includes it.',
+      build(vals) {
+        const { cells, shown } = collect(fields, vals);
+        return { plan: planInsert(model, id, cells, shown, title, totalCovering(model, data, id, 'amount')), warn: [] };
+      },
+    };
+  }
 
   switch (id) {
     case 'mf':
@@ -467,9 +492,27 @@ function addEditor(model: Model, data: SheetData, id: AddableId): EditorDef {
 
 /* ---------- removing a row ---------- */
 
-function removeEditor(model: Model, id: RemovableRow, rec: Row | undefined): EditorDef {
-  const tbl = model.tables[id];
+function removeEditor(model: Model, id: RemovableRow | LedgerId, rec: Row | undefined): EditorDef {
+  const tbl = tableOf(model, id);
   if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
+  if (isLedgerId(id)) {
+    const title = `Delete ${String(rec.description)}`;
+    const amount = rec.amount;
+    return {
+      title,
+      danger: true,
+      hint: `Removes this entry's row from ${tbl.spec.tab}. The Net Balance adjusts by itself.`,
+      fields: [],
+      build() {
+        return {
+          plan: planRemove(model, id, rec, title),
+          warn: isNum(amount) && amount !== 0
+            ? [`The ledger's balance goes ${amount > 0 ? 'down' : 'up'} by ${inr(Math.abs(amount))}, and so does your net worth if Receivables is linked to it.`]
+            : [],
+        };
+      },
+    };
+  }
   const due = id === 'duesInr' || id === 'duesAed';
   const property = id === 'realEstate';
   const aed = id === 'bankAed' || id === 'duesAed' || property;
@@ -479,7 +522,9 @@ function removeEditor(model: Model, id: RemovableRow, rec: Row | undefined): Edi
   return {
     title,
     danger: true,
-    hint: `Removes this ${due ? 'item' : property ? 'property' : "account's row"} from ${tbl.spec.tab}. The rows below it move up; totals and everything else on the tab stay where they are.`,
+    hint: property
+      ? `Removes this property's row from ${tbl.spec.tab}. The total adjusts by itself.`
+      : `Removes this ${due ? 'item' : "account's row"} from ${tbl.spec.tab}. The rows below it move up; totals and everything else on the tab stay where they are.`,
     fields: [],
     build() {
       return {
@@ -520,6 +565,6 @@ export function editorFor(model: Model, data: SheetData, req: EditRequest): Edit
     case 'cell': return cellEditor(model, req.path);
     case 'add': return addEditor(model, data, req.id);
     case 'link': return linkEditor(model, req.sheet);
-    case 'remove': return removeEditor(model, req.id, (model.rows[req.id] as Row[]).find((r) => r._key === req.key));
+    case 'remove': return removeEditor(model, req.id, rowsOf(model, req.id).find((r) => r._key === req.key));
   }
 }

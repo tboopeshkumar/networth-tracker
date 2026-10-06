@@ -119,6 +119,8 @@ function GroupBand({ label, note, total }: { label: string; note: string | null;
 function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; onEdit: OnEdit }) {
   const edit = canEdit ? v.edit : undefined;
   const remove = canEdit ? v.remove : undefined;
+  // Some sections only delete (ledger entries): the actions column is there for either
+  const acts = !!(edit || remove);
   const actions = (r: Row) => (
     <span className="inline-flex items-center">
       {edit && <EditButton request={edit(r)} onEdit={onEdit} />}
@@ -135,7 +137,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
         {v.recs.map((r: Row) => {
           const c = v.card(r);
           // With nothing else to show beside the sub line, Edit sits there instead of on a row of its own
-          const inlineEdit = edit && !c.foot && !c.right;
+          const inlineEdit = acts && !c.foot && !c.right;
           return (
             <div className="flex gap-3 border-b border-grid py-2.5 last:border-0" key={r._key}>
               {c.icon && <div className="pt-0.5">{c.icon}</div>}
@@ -151,10 +153,10 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                   ? <Pill tone={c.right.tone as 'up' | 'down'}>{c.right.text}</Pill>
                   : <span className="whitespace-nowrap tabular-nums">{c.right.text}</span>)}
               </div>
-              {(c.foot || (edit && !inlineEdit)) && (
+              {(c.foot || (acts && !inlineEdit)) && (
                 <div className="mt-1.5 flex items-center justify-between gap-3 text-[11.5px] text-ink-3">
                   <span className="min-w-0 truncate">{c.foot}</span>
-                  {edit && actions(r)}
+                  {acts && actions(r)}
                 </div>
               )}
               </div>
@@ -169,7 +171,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
           <thead>
             <tr>
               {v.columns.map((col) => <th key={col.head} className={col.num ? 'num' : undefined}>{col.head}</th>)}
-              {edit && <th />}
+              {acts && <th />}
             </tr>
           </thead>
           <tbody>
@@ -180,7 +182,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                     {col.render(r)}
                   </td>
                 ))}
-                {edit && <td className="act">{actions(r)}</td>}
+                {acts && <td className="act">{actions(r)}</td>}
               </tr>
             ))}
           </tbody>

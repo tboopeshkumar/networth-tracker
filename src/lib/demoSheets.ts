@@ -105,6 +105,12 @@ export class DemoSheets implements SheetsBackend {
       }
       return;
     }
+    if ('deleteDimension' in req) {
+      const { sheetId, startIndex: at, endIndex: to } = req.deleteDimension.range;
+      const t = this.tabOf(sheetId);
+      for (const g of [this.f.values[t], this.f.formulas[t]]) g.splice(at, to - at);
+      return;
+    }
     if ('insertDimension' in req) {
       const { sheetId, startIndex: at } = req.insertDimension.range;
       const t = this.tabOf(sheetId);

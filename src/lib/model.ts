@@ -200,6 +200,8 @@ export interface Summary {
 export interface Ledger {
   sheet: string;
   title: string;
+  /** where its entries sit on its tab, for adding and removing them */
+  table: Table;
   rows: LedgerRow[];
   balance: Cell | null;
   balanceRef: string | null;
@@ -232,6 +234,18 @@ export interface Model {
   etoro: BrokerFeed | null;
   ibkr: BrokerFeed | null;
 }
+
+/** A family-loan ledger's entries, addressed like a table: "ledger:" + its tab's name. */
+export type LedgerId = `ledger:${string}`;
+/** Anything rows can be written to: a fixed table, or a ledger tab. */
+export type TableId = SpecId | LedgerId;
+export const isLedgerId = (id: string): id is LedgerId => id.startsWith('ledger:');
+const ledgerOf = (model: Model, id: LedgerId): Ledger | undefined => model.ledgers[id.slice('ledger:'.length)];
+
+export const tableOf = (model: Model, id: TableId): Table | null =>
+  (isLedgerId(id) ? ledgerOf(model, id)?.table ?? null : model.tables[id]);
+export const rowsOf = (model: Model, id: TableId): Row[] =>
+  (isLedgerId(id) ? ledgerOf(model, id)?.rows ?? [] : model.rows[id] as Row[]);
 
 /* ---------- parsing ---------- */
 
@@ -381,6 +395,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
       ledgers[sheet] = {
         sheet,
         title: String(f.account),
+        table: lt,
         rows: readRows<LedgerRow>(grid, lt),
         balance: lt.totalRow === null ? null : cellAt(grid, lt.totalRow, lt.cols.amount) ?? null,
         balanceRef: lt.totalRow === null ? null : a1(sheet, lt.totalRow, lt.cols.amount),
