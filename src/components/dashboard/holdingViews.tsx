@@ -64,6 +64,18 @@ const editRow = (id: EditableRow) => (r: Row): EditRequest => ({ kind: 'row', id
 // Erases the per-view record type so views can share one array.
 const view = <R extends Row>(v: View<R>) => v as unknown as View;
 
+/** What was put in and what it's worth now, in the holding's own currency: the line above a section's rows. */
+function InvestedWorth({ invested, worth, money }: { invested: number; worth: number; money: (n: number) => string }) {
+  const gain = worth - invested;
+  return (
+    <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
+      <span>Invested <b className="font-semibold tabular-nums">{money(invested)}</b></span>
+      <span className="text-ink-3">worth <b className="font-semibold tabular-nums text-ink">{money(worth)}</b></span>
+      <Pill tone={tone(gain)}>{gain > 0 ? '+' : gain < 0 ? '−' : ''}{money(Math.abs(gain))} · {signedPct(ret(gain, invested))}</Pill>
+    </div>
+  );
+}
+
 /** The oldest date a section is priced from: what its total is only as fresh as. */
 function oldest(dates: unknown[]): string | undefined {
   const known = dates.filter(isNum);
@@ -187,9 +199,18 @@ export function buildViews(model: Model): View[] {
     ...duesView(model, 'duesAed'),
     ...(['goldUae', 'silverUae'] as const).map((id) => {
       const unit = id === 'goldUae' ? 'g' : 'oz';
+      // The tab's summary block: what the purchases cost and what the holding is worth now, in AED
+      const S = model.summaries[id];
+      const invested = S?.investedAed.value;
+      const worth = S?.currentAed.value;
+      const toInr = n0(model.cells.fxAedInr?.value);
       return view<RowOf<typeof id>>({
         id, group: 'Metals · UAE', name: id === 'goldUae' ? 'Gold (UAE)' : 'Silver (UAE)', add: { kind: 'add', id },
         recs: R[id], total: `${num(sum(R[id], 'qty'))} ${unit}`,
+        inr: isNum(worth) && toInr > 0 ? worth * toInr : undefined,
+        lead: isNum(invested) && invested > 0 && isNum(worth)
+          ? <InvestedWorth invested={invested} worth={worth} money={(n) => `AED ${num(n, 0)}`} />
+          : undefined,
         columns: [
           { head: 'Bought', render: (r) => fmtDate(r.date) },
           { head: 'Source', render: (r) => text(r.source) },
@@ -280,20 +301,13 @@ function realEstateView(model: Model): View[] {
   const pnl = (r: Property) => (isNum(r.invested) && r.invested > 0 && isNum(r.valueAed) ? r.valueAed - r.invested : null);
   const totalAed = sum(recs, 'valueAed');
   const investedAed = sum(recs, 'invested');
-  const gainAed = totalAed - investedAed;
   const toInr = n0(model.cells.fxAedInr?.value);
   return [view<Property>({
     id: 'realEstate', group: 'Investments', name: 'Real estate', recs,
     inr: toInr > 0 ? totalAed * toInr : undefined,
     total: toInr > 0 ? <Amount value={totalAed * toInr} /> : aed(totalAed),
     // What was put in comes first, in the currency it was paid in; the header total is in rupees
-    lead: hasInvested && investedAed > 0 ? (
-      <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
-        <span>Invested <b className="font-semibold tabular-nums">{aed(investedAed)}</b></span>
-        <span className="text-ink-3">worth <b className="font-semibold tabular-nums text-ink">{aed(totalAed)}</b></span>
-        <Pill tone={tone(gainAed)}>{signed(gainAed)} · {signedPct(ret(gainAed, investedAed))}</Pill>
-      </div>
-    ) : undefined,
+    lead: hasInvested && investedAed > 0 ? <InvestedWorth invested={investedAed} worth={totalAed} money={aed} /> : undefined,
     edit: editRow('realEstate'), add: { kind: 'add', id: 'realEstate' },
     remove: (r) => ({ kind: 'remove', id: 'realEstate', key: r._key }),
     columns: [
