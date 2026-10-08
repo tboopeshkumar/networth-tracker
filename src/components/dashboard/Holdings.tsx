@@ -1,11 +1,11 @@
 import { IconCheck, IconChevronRight, IconPlus } from '@tabler/icons-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
 import { Amount, Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
-import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupInr, groupNote, type View } from './holdingViews';
+import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupInr, groupNote, holdersIn, rowsFor, type View } from './holdingViews';
 
 interface Props {
   model: Model;
@@ -121,6 +121,14 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
   const remove = canEdit ? v.remove : undefined;
   // Some sections only delete (ledger entries): the actions column is there for either
   const acts = !!(edit || remove);
+
+  // Narrowing to one holder, where the section records one and has more than one
+  const [who, setWho] = useState<string | null>(null);
+  const names = useMemo(() => holdersIn(v), [v]);
+  // A holder whose last row was just deleted is no longer a choice
+  const picked = who !== null && names.includes(who) ? who : null;
+  const recs = rowsFor(v, picked);
+
   const actions = (r: Row) => (
     <span className="inline-flex items-center">
       {edit && <EditButton request={edit(r)} onEdit={onEdit} />}
@@ -131,10 +139,28 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
     <>
       {v.ledger && <LedgerSummary ledger={v.ledger} canEdit={canEdit} onEdit={onEdit} />}
       {v.lead}
+      {names.length > 1 && v.holders && (
+        <div className="mb-1 flex flex-wrap items-center gap-1.5 pt-1" role="group" aria-label="Filter by holder">
+          {[null, ...names].map((h) => (
+            <button
+              key={h ?? ''} type="button" aria-pressed={picked === h} onClick={() => setWho(h)}
+              className={cx('cursor-pointer rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+                picked === h ? 'border-accent bg-accent font-semibold text-white' : 'border-line bg-surface text-ink-2 hover:bg-sunk')}
+            >
+              {h ?? 'All'}
+            </button>
+          ))}
+          {picked && (
+            <span className="ml-auto text-xs text-ink-3 tabular-nums">
+              {recs.length} of {v.recs.length} · <b className="font-semibold text-ink">{v.holders.total(recs)}</b>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* phones: one card per record */}
       <div className="md:hidden">
-        {v.recs.map((r: Row) => {
+        {recs.map((r: Row) => {
           const c = v.card(r);
           // With nothing else to show beside the sub line, Edit sits there instead of on a row of its own
           const inlineEdit = acts && !c.foot && !c.right;
@@ -175,7 +201,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
             </tr>
           </thead>
           <tbody>
-            {v.recs.map((r: Row) => (
+            {recs.map((r: Row) => (
               <tr key={r._key}>
                 {v.columns.map((col) => (
                   <td key={col.head} className={[col.num && 'num', col.name && 'name', col.className?.(r)].filter(Boolean).join(' ') || undefined}>

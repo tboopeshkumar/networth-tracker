@@ -8,6 +8,7 @@ import { test } from 'vitest';
 import { PickScreen } from '../src/components/Screens';
 import { Holdings } from '../src/components/dashboard/Holdings';
 import { Positions } from '../src/components/dashboard/Positions';
+import { buildViews, holdersIn, rowsFor } from '../src/components/dashboard/holdingViews';
 import { Summary } from '../src/components/dashboard/Summary';
 import { DemoSheets, type Fixture } from '../src/lib/demoSheets';
 import { makeLinker } from '../src/lib/links';
@@ -66,4 +67,31 @@ test('an open ledger offers add in its header and delete on every entry, to edit
   const viewer = render(false);
   assert.equal(count(viewer, 'aria-label="Delete"'), 0);
   assert.equal(count(viewer, 'aria-label="Add to'), 0);
+});
+
+test('sections that record a holder can be narrowed to one, and only those', async () => {
+  if (!existsSync(FIX)) return;
+  const { model } = await loadAll(new DemoSheets(JSON.parse(readFileSync(FIX, 'utf8')) as Fixture));
+  const views = buildViews(model);
+  const withHolders = views.filter((v) => v.holders).map((v) => v.id).sort();
+  assert.deepEqual(withHolders, ['bankAed', 'bankInr', 'fd', 'mf', 'sgb']);
+
+  for (const v of views.filter((x) => x.holders)) {
+    const names = holdersIn(v);
+    // Every row belongs to exactly one name; the parts add back up to the whole
+    assert.equal(names.reduce((a, h) => a + rowsFor(v, h).length, 0), v.recs.filter((r) => v.holders!.of(r)).length, v.id);
+    for (const h of names) {
+      assert.ok(!/\(/.test(h), 'a note after the name is not part of it');
+      assert.ok(rowsFor(v, h).every((r) => v.holders!.of(r) === h));
+    }
+    assert.equal(rowsFor(v, null).length, v.recs.length);
+    assert.equal(rowsFor(v, 'Nobody By This Name').length, v.recs.length, 'an unknown name shows everything');
+
+    // Chips are drawn only where there is a choice to make
+    const html = renderToStaticMarkup(
+      <Holdings model={model} canEdit={false} onEdit={() => {}} open={new Set([v.id])} onToggle={() => {}} flash={null} sectionRef={() => {}} only={v.group} />,
+    );
+    const chips = html.split('aria-pressed=').length - 1;
+    assert.equal(chips, names.length > 1 ? names.length + 1 : 0, `${v.id}: All plus one chip per holder`);
+  }
 });

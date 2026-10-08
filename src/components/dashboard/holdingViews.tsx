@@ -51,6 +51,8 @@ export interface View<R extends Row = Row> {
   ledger?: Ledger;
   /** a line above the rows, for figures that belong to the section rather than a row */
   lead?: ReactNode;
+  /** rows can be narrowed to one holder: whose a row is, and what a narrowed list adds up to */
+  holders?: { of: (r: R) => string; total: (rows: R[]) => ReactNode };
 }
 
 const text = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : String(v));
@@ -60,6 +62,22 @@ const fdStatus = (r: RowOf<'fd'>): [string, string] =>
   (!isNum(r.maturityDate) ? ['no date', 'down'] : r.maturityDate < todaySerial() ? ['matured', 'down'] : ['active', '']);
 
 const editRow = (id: EditableRow) => (r: Row): EditRequest => ({ kind: 'row', id, key: r._key });
+/** Whose a row is. A holder is sometimes written with a note ("Name (1-Sep-26)"): the name alone. */
+const holderOf = (r: Row) => String(r.holder ?? '').replace(/\s*\(.*$/, '').trim();
+const byHolder = (field: string, money: (n: number) => ReactNode = (n) => <Amount value={n} />) =>
+  ({ of: holderOf, total: (rows: Row[]) => money(sum(rows, field)) });
+
+/** The holders a section can be narrowed to, most rows first. Empty when it records none. */
+export function holdersIn(v: View): string[] {
+  if (!v.holders) return [];
+  const n = new Map<string, number>();
+  for (const r of v.recs) { const h = v.holders.of(r); if (h) n.set(h, (n.get(h) ?? 0) + 1); }
+  return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([h]) => h);
+}
+/** A section's rows for one holder; all of them for null, or for a name it no longer has. */
+export function rowsFor(v: View, who: string | null): Row[] {
+  return who !== null && v.holders && holdersIn(v).includes(who) ? v.recs.filter((r) => v.holders!.of(r) === who) : v.recs;
+}
 
 // Erases the per-view record type so views can share one array.
 const view = <R extends Row>(v: View<R>) => v as unknown as View;
@@ -91,6 +109,7 @@ export function buildViews(model: Model): View[] {
       note: oldest(R.mf.map((r) => r.navDate)),
       edit: editRow('mf'),
       add: { kind: 'add', id: 'mf' },
+      holders: byHolder('current'),
       columns: [
         { head: 'Fund', name: true, render: (r) => <span className="flex items-center gap-2.5"><AmcBadge fund={r.fund} size={28} /><span>{text(r.fund)}<span className="sub2 block">{text(r.platform)}</span></span></span> },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -133,6 +152,7 @@ export function buildViews(model: Model): View[] {
       id: 'sgb', group: 'Investments', name: 'Gold (SGB)', recs: R.sgb, inr: sum(R.sgb, 'market'), total: <Amount value={sum(R.sgb, 'market')} />,
       note: oldest(R.sgb.map((r) => r.valueDate)),
       edit: editRow('sgb'),
+      holders: byHolder('market'),
       columns: [
         { head: 'Holding', name: true, render: (r) => text(r.holding) },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -152,6 +172,7 @@ export function buildViews(model: Model): View[] {
       id: 'fd', group: 'Investments', name: 'Fixed deposits', recs: R.fd, inr: sum(R.fd, 'amount'), total: <Amount value={sum(R.fd, 'amount')} />,
       edit: editRow('fd'),
       add: { kind: 'add', id: 'fd' },
+      holders: byHolder('amount'),
       columns: [
         { head: 'Institution', name: true, render: (r) => <>{text(r.institution)}<div className="sub2">{r.ref ? String(r.ref) : ''}</div></> },
         { head: 'Holder', render: (r) => text(r.holder) },
@@ -175,6 +196,7 @@ export function buildViews(model: Model): View[] {
       id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: <Amount value={sum(R.bankInr, 'balance')} />,
       edit: editRow('bankInr'),
       add: { kind: 'add', id: 'bankInr' },
+      holders: byHolder('balance'),
       remove: (r) => ({ kind: 'remove', id: 'bankInr', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
@@ -187,6 +209,7 @@ export function buildViews(model: Model): View[] {
       id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: R.bankAed, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
       edit: editRow('bankAed'),
       add: { kind: 'add', id: 'bankAed' },
+      holders: byHolder('balance', (n) => `AED ${num(n, 0)}`),
       remove: (r) => ({ kind: 'remove', id: 'bankAed', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
