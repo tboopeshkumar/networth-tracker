@@ -9,6 +9,7 @@ import { a1, colIndex, isNum, n0, type Cell } from './format';
 import { JEWELLERY_TAB, readJewellery, type Jewellery } from './jewellery';
 import { RATES_TAB, readRatesFeed, type FeedRate } from './ratesFeed';
 import { ETORO_TAB, IBKR_TAB, readBrokerFeed, type BrokerFeed } from './brokerFeed';
+import { DAILY_TAB, readDailyLog, type DaySnapshot } from './dailyLog';
 
 export type Grid = Cell[][];
 export type Grids = Record<string, Grid>;
@@ -139,7 +140,7 @@ export const SPECS = {
 };
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -233,6 +234,8 @@ export interface Model {
   /** Positions written by the broker feed scripts, if the sheet has those tabs. */
   etoro: BrokerFeed | null;
   ibkr: BrokerFeed | null;
+  /** Each night's Net Worth lines, oldest first, if the sheet keeps a Daily Log tab. */
+  daily: DaySnapshot[];
 }
 
 /** A family-loan ledger's entries, addressed like a table: "ledger:" + its tab's name. */
@@ -474,7 +477,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]), daily: readDailyLog(values[DAILY_TAB]) };
 }
 
 /**

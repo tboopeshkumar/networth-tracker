@@ -236,6 +236,7 @@ apps-script/NavFeed.gs       daily AMFI NAVs, runs inside the sheet
 apps-script/RatesFeed.gs     daily 22C gold and AED → INR rates
 apps-script/EtoroFeed.gs     daily eToro positions (read-only API key)
 apps-script/IbkrFeed.gs      daily IBKR positions (Flex Web Service)
+apps-script/DailyLog.gs      nightly record of each Net Worth line, for "What changed"
 tools/                       fixture builder, git hooks
 .github/workflows/deploy.yml build, test, check and publish
 ```
@@ -294,6 +295,15 @@ The app lists each holding under Holdings → Investments → eToro, and *Worth 
 4. **Net Worth → Set IBKR token** and enter the token and Query ID; they are kept in the script's user properties.
 5. **Net Worth → Refresh IBKR now**, then **Refresh IBKR daily (8am IST)**.
 6. Point the IBKR line on the Equity tab at the feed: *Current (Local)* `=VLOOKUP("Total",'IBKR Feed'!A:F,6,FALSE)` and *NAV Date* `=INT(VLOOKUP("Total",'IBKR Feed'!A:H,8,FALSE))`.
+
+### Nightly record for "What changed"
+
+Invested capital and net worth move by themselves from one day to the next: AED holdings are converted at the day's rate, and cash, deposits and loans count at their current balance. `apps-script/DailyLog.gs` records every Net Worth line (invested and current) and the AED → INR rate into a `Daily Log` tab each night. The app compares the sheet as it is now with the last day recorded before today and lists what moved, under **What changed** on the dashboard. It only reads and writes the spreadsheet itself.
+
+1. In **Extensions → Apps Script**, add a script file, paste `DailyLog.gs`, and paste the updated `NavFeed.gs` (menu items). Save and reload the sheet.
+2. **Net Worth → Record daily log now**, then **Record daily log every night (11pm UAE)**.
+
+The section appears from the day after the first record. *Worth a look* flags the log if it stops recording. Rows older than 400 days are removed.
 
 ### Daily mutual fund NAVs
 

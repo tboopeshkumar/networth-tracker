@@ -8,6 +8,7 @@ import { BTN, Card, type OnEdit } from '../ui';
 import { Allocation } from './Allocation';
 import { Checks } from './Checks';
 import { Holdings } from './Holdings';
+import { Movers } from './Movers';
 import { Positions } from './Positions';
 import { RatesInputs } from './RatesInputs';
 import { Summary } from './Summary';
@@ -60,6 +61,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
   return (
     <>
       <Summary model={model} />
+      {/* What moved since the last daily record, for sheets that keep one */}
+      <Movers model={model} linkOf={linkOf} onDrill={drill} />
       {/* Cash first: the balances checked most often, straight after the summary */}
       <Holdings model={model} canEdit={canEdit} onEdit={onEdit} only="Cash"
         open={open} onToggle={toggle} flash={flash} sectionRef={sectionRef} />

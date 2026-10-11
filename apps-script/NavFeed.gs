@@ -56,6 +56,10 @@ function onOpen() {
     .addItem('Set IBKR token', 'setIbkrToken')
     .addItem('Refresh IBKR now', 'refreshIbkr')
     .addItem('Refresh IBKR daily (8am IST)', 'installIbkrTrigger')
+    .addSeparator()
+    // From DailyLog.gs, if it's in this project
+    .addItem('Record daily log now', 'logDaily')
+    .addItem('Record daily log every night (11pm UAE)', 'installDailyLogTrigger')
     .addToUi();
 }
 

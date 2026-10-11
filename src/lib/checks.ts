@@ -107,5 +107,15 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
     });
   }
 
+  // The nightly Daily Log script stopped: "what changed" would compare against an old day
+  const lastLog = model.daily.at(-1)?.day;
+  if (lastLog !== undefined && todaySerial() - lastLog > 2) {
+    out.push({
+      id: 'daily-log',
+      title: `The daily log hasn’t recorded since ${fmtDate(lastLog)}.`,
+      detail: 'In the sheet, use Net Worth → Record daily log now to see the error, then Record daily log every night to reinstall the schedule.',
+    });
+  }
+
   return out;
 }
