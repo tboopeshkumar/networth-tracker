@@ -8,7 +8,7 @@ import { BTN, Card, type OnEdit } from '../ui';
 import { Allocation } from './Allocation';
 import { Checks } from './Checks';
 import { Holdings } from './Holdings';
-import { Movers } from './Movers';
+import { Movers, MoversOverTime } from './Movers';
 import { Positions } from './Positions';
 import { RatesInputs } from './RatesInputs';
 import { Summary } from './Summary';
@@ -83,6 +83,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
         <ChangeChart series={trend} />
       </Card>
       <Allocation model={model} />
+      {/* The longer view of the same log, last: looked at now and then, not daily */}
+      <MoversOverTime model={model} linkOf={linkOf} onDrill={drill} />
     </>
   );
 }

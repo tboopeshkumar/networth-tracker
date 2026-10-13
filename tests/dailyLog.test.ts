@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'vitest';
 
 import { runChecks } from '../src/lib/checks';
-import { DAILY_TAB, changesSince, readDailyLog } from '../src/lib/dailyLog';
+import { DAILY_TAB, changesSince, isPending, readDailyLog } from '../src/lib/dailyLog';
 import { isoToSerial, n0, type Cell } from '../src/lib/format';
 import { buildModel } from '../src/lib/model';
 import type { Fixture } from '../src/lib/demoSheets';
@@ -57,10 +57,10 @@ withFixture('without a log there is nothing to compare; with only today there is
 
   const today = isoToSerial('2026-05-10');
   const m = withLog(plain.rows.networth.map((r) => ['2026-05-10', String(r.asset), r.invested, r.current]));
-  assert.equal(changesSince(m, today), 'first');
+  assert.deepEqual(changesSince(m, today), { pending: today + 1 }, 'tomorrow there will be a day to compare with');
   // The same rows read the next day are yesterday's: nothing has moved
   const next = changesSince(m, today + 1);
-  assert.ok(next && next !== 'first');
+  assert.ok(next && !isPending(next));
   assert.deepEqual([next.lines.length, Math.round(next.invested), Math.round(next.current), next.rates.length], [0, 0, 0, 0]);
 });
 
@@ -79,7 +79,7 @@ withFixture('each moved line is reported, and the parts add up to the change in 
     [day, 'Rate: AED → INR', '', rate - 0.05],
   ]);
   const ch = changesSince(m, isoToSerial('2026-05-10'));
-  assert.ok(ch && ch !== 'first');
+  assert.ok(ch && !isPending(ch));
   assert.equal(ch.since, isoToSerial(day));
 
   const by = Object.fromEntries(ch.lines.map((x) => [x.asset, x]));
@@ -106,4 +106,28 @@ withFixture('a log that stopped recording is flagged', () => {
   const m = withLog([['2020-01-01', String(plain.rows.networth[0].asset), 1, 1]]);
   assert.ok(runChecks(m, fixture().values, true).some((c) => c.id === 'daily-log'));
   assert.ok(!runChecks(plain, noLog().values, true).some((c) => c.id === 'daily-log'), 'no log, no nag');
+});
+
+withFixture('a week, a month or a year back uses the last record on or before that day', () => {
+  const plain = plainModel();
+  const a = plain.rows.networth[0];
+  const today = isoToSerial('2026-05-31');
+  const row = (day: string, current: number) => [day, String(a.asset), a.invested, current] as Cell[];
+  const m = withLog([
+    row('2026-05-01', n0(a.current) - 300), // 30 days back
+    row('2026-05-20', n0(a.current) - 200), // the night of the 24th was missed: a week back falls to this one
+    row('2026-05-28', n0(a.current) - 100),
+    row('2026-05-30', n0(a.current) - 10),
+  ]);
+  const moved = (back: number) => {
+    const c = changesSince(m, today, back);
+    assert.ok(c && !isPending(c), `${back} days`);
+    return [c.since, Math.round(c.lines.find((x) => x.asset === String(a.asset))!.current)];
+  };
+  assert.deepEqual(moved(1), [isoToSerial('2026-05-30'), 10]);
+  assert.deepEqual(moved(7), [isoToSerial('2026-05-20'), 200]);
+  assert.deepEqual(moved(30), [isoToSerial('2026-05-01'), 300]);
+  // The log is 30 days old: a year back isn't there yet, and says when it will be
+  assert.deepEqual(changesSince(m, today, 365), { pending: isoToSerial('2026-05-01') + 365 });
+  assert.equal(changesSince(plain, today, 7), null);
 });

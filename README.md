@@ -303,7 +303,7 @@ Invested capital and net worth move by themselves from one day to the next: AED 
 1. In **Extensions → Apps Script**, add a script file, paste `DailyLog.gs`, and paste the updated `NavFeed.gs` (menu items). Save and reload the sheet.
 2. **Net Worth → Record daily log now**, then **Record daily log every night (11pm UAE)**.
 
-The section appears from the day after the first record. *Worth a look* flags the log if it stops recording. Rows older than 400 days are removed.
+The section appears from the day after the first record. The same comparison against a week, a month and a year ago sits at the end of the dashboard under **Changes over time**; each opens once the log reaches back that far. *Worth a look* flags the log if it stops recording. Rows older than 400 days are removed.
 
 ### Daily mutual fund NAVs
 

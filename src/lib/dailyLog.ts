@@ -71,15 +71,21 @@ export interface Changes {
 /** Under a rupee is rounding, not a change. */
 const moved = (n: number) => Math.abs(n) >= 1;
 
+/** The log doesn't reach that far back yet; `pending` is the day it will. */
+export interface Pending { pending: number }
+export const isPending = (c: Changes | Pending): c is Pending => 'pending' in c;
+
 /**
- * What changed between the last recorded day before today and the sheet as it
- * is now. `null` when there is no log; `'first'` when the log has only today.
+ * What changed between the sheet as it is now and the record from `back` days
+ * ago: the last one on or before that day, so a night the log missed falls
+ * back to the one before. One day back is "since yesterday". `null` when the
+ * sheet keeps no log.
  */
-export function changesSince(model: Model, today = todaySerial()): Changes | 'first' | null {
+export function changesSince(model: Model, today = todaySerial(), back = 1): Changes | Pending | null {
   const log = model.daily;
   if (!log.length) return null;
-  const base = log.filter((d) => d.day < today).at(-1);
-  if (!base) return 'first';
+  const base = log.filter((d) => d.day <= today - back).at(-1);
+  if (!base) return { pending: log[0].day + back };
 
   const lines: LineChange[] = [];
   const seen = new Set<string>();
