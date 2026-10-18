@@ -247,6 +247,8 @@ tools/                       fixture builder, git hooks
 
 These run in Google Sheets itself, not in the app.
 
+**No feed ever wipes a value.** A price the source doesn't have on a given day keeps its previous value and date, an implausible jump is held back, and a broker statement that has lost every holding is refused. Each feed records how its last run went in a `Feed Status` tab (OK, Warning or Error, with the reason), and the app shows anything other than OK under *Worth a look*, along with any holding that has units but no price. The shared helpers for this live in `NavFeed.gs`, so paste it again whenever you update any of the other scripts.
+
 ### Live AED → INR rate
 
 In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from Google Finance*. It writes `=GOOGLEFINANCE("CURRENCY:USDINR")/3.6725`. AED is pegged to USD at 3.6725, so this tracks the market with no upkeep. Quotes can be up to 20 minutes old.
@@ -272,6 +274,8 @@ The app then shows each rate's date, and *Worth a look* flags the feed if it has
 ### Daily NPS NAVs
 
 The same `NavFeed.gs` also prices NPS from NPS Trust's daily NAV report (`npstrust.org.in/nav-report-excel`, every scheme with its Scheme ID). On the NPS tab, add a holdings table headed **Scheme ID | Scheme | Units | NAV | Value | NAV date**, one row per scheme you hold (IDs such as `SM001004`; "POP" is the route you invested through, not a separate scheme). NAV, Value and NAV date are formulas over an `NPS Feed` tab the script rewrites. Point *Gain* at `=SUM(<values>)-<invested>` and *As of* at `=MIN(<nav dates>)`; Net Worth keeps reading Invested and Current Value as before. **Net Worth → Refresh NPS now** runs it once; afterwards it rides on the daily NAV refresh.
+
+The daily report only holds the latest day any fund manager published, so on weekends and holidays it can miss your schemes entirely; and some schemes moved to new IDs on 1 Apr 2026 (SBI Scheme C - Tier I SM001004 → SM001026, LIC Scheme G - Tier I SM003007 → SM003027). Whatever the daily report lacks is looked up in that scheme's own NAV history (`scheme-wise-nav-report-excel`), which follows a scheme across its new ID; column F of `NPS Feed` notes when that happened.
 
 ### Daily eToro portfolio
 

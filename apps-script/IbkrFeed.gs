@@ -140,13 +140,18 @@ function flexToPlain_(root) {
 /* ---------- refresh ---------- */
 
 function refreshIbkr() {
+  runFeed_('IBKR', refreshIbkr_);
+}
+
+function refreshIbkr_(warn) {
   const stmt = flexToPlain_(fetchFlexStatement_());
-  if (!stmt.hasCash) console.warn('No Cash Report in the Flex Query; cash counted as 0. Add the Cash Report section to include it.');
+  if (!stmt.hasCash) warn('No Cash Report in the IBKR Flex Query, so cash is counted as 0. Add the Cash Report section to include it.');
   const rows = ibkrRows_(stmt, new Date());
   const headers = ['Symbol', 'Name', 'Type', 'Units', 'Invested (' + stmt.base + ')', 'Value (' + stmt.base + ')', 'P&L (' + stmt.base + ')', 'Refreshed'];
 
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(IBKR_TAB) || ss.insertSheet(IBKR_TAB);
+  guardBrokerRows_(brokerRowsNow_(sh), rows, 'IBKR');
   sh.clearContents();
   sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
   sh.setFrozenRows(1);

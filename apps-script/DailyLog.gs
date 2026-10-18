@@ -35,6 +35,10 @@ function setupDailyLog() {
 }
 
 function logDaily() {
+  runFeed_('Daily log', logDaily_);
+}
+
+function logDaily_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(DAILY_TAB) || setupDailyLog();
   SpreadsheetApp.flush();
   const now = new Date();

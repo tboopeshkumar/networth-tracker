@@ -161,6 +161,10 @@ function etoroRates_(ids) {
 /* ---------- refresh ---------- */
 
 function refreshEtoro() {
+  runFeed_('eToro', refreshEtoro_);
+}
+
+function refreshEtoro_(warn) {
   const portfolio = etoroGet_('/trading/info/real/pnl');
   const p = portfolio.clientPortfolio || portfolio;
   const own = (p.positions || []).map((pos) => pos.instrumentID);
@@ -169,11 +173,14 @@ function refreshEtoro() {
   const priced = [...new Set([...own, ...copied])];
   const rates = priced.length ? etoroRates_(priced) : {};
   const unpriced = priced.filter((id) => !(rates[id] && rates[id].bid > 0));
-  if (unpriced.length) console.warn('No live rate for instruments ' + unpriced.join(', ') + '; valued at cost plus any P&L eToro sent.');
-  const rows = etoroRows_(portfolio, ids.length ? etoroInfo_(ids) : {}, rates, new Date());
+  const info = ids.length ? etoroInfo_(ids) : {};
+  const rows = etoroRows_(portfolio, info, rates, new Date());
 
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName(ETORO_TAB) || ss.insertSheet(ETORO_TAB);
+  const before = brokerRowsNow_(sh);
+  keepUnpriced_(rows, unpriced.map((id) => (info[id] && info[id].symbol) || '#' + id), before, warn);
+  guardBrokerRows_(before, rows, 'eToro');
   sh.clearContents();
   sh.getRange(1, 1, 1, ETORO_HEADERS.length).setValues([ETORO_HEADERS]).setFontWeight('bold');
   sh.setFrozenRows(1);
@@ -183,6 +190,34 @@ function refreshEtoro() {
   sh.getRange('D:D').setNumberFormat('#,##0.####');
   sh.getRange('E:G').setNumberFormat('#,##0.00');
   sh.getRange('H:H').setNumberFormat('d mmm yyyy h:mm');
+}
+
+/**
+ * A holding eToro sent no live price for would otherwise be valued at cost.
+ * Its value from the last refresh is kept instead (scaled if the units
+ * changed), and the Total row is recomputed. Rows are changed in place.
+ */
+function keepUnpriced_(rows, symbols, before, warn) {
+  let changed = false;
+  for (const symbol of symbols) {
+    const row = rows.find((r) => r[0] === symbol);
+    const was = before[symbol];
+    if (!row) continue;
+    if (was && typeof was.value === 'number' && typeof was.units === 'number' && was.units) {
+      row[5] = was.value * (row[3] / was.units);
+      row[6] = row[5] - row[4];
+      changed = true;
+      warn('eToro sent no live price for ' + symbol + '; its value from the last refresh was kept.');
+    } else {
+      warn('eToro sent no live price for ' + symbol + ', and there was no earlier value; it is valued at cost.');
+    }
+  }
+  if (!changed) return;
+  const total = rows.find((r) => r[0] === 'Total');
+  const body = rows.filter((r) => r !== total);
+  total[4] = body.reduce((a, r) => a + r[4], 0);
+  total[5] = body.reduce((a, r) => a + r[5], 0);
+  total[6] = total[5] - total[4];
 }
 
 function installEtoroTrigger() {

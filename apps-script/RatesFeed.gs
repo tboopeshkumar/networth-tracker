@@ -12,8 +12,9 @@
  *   A Rate   B Value   C Source   D Rate date   E Refreshed
  * Point the cells that use a rate at it, for example
  *   =VLOOKUP("Gold 22C (₹/g)", 'Rates Feed'!A:B, 2, FALSE)
- * A rate that fails to fetch keeps its previous value, so nothing that
- * depends on it breaks; column E then shows the last good refresh.
+ * A rate that fails to fetch, or comes back far from its previous value,
+ * keeps its previous value, so nothing that depends on it breaks; column E
+ * then shows the last good refresh, and the Feed Status tab says why.
  */
 
 const RATES_TAB = 'Rates Feed';
@@ -47,22 +48,41 @@ function rateRow_(sh, label) {
   return row;
 }
 
+// A rate that moved more than this since the last refresh is more likely a misread page than the market
+const RATE_MAX_JUMP = 0.15;
+
 function refreshRates() {
+  runFeed_('Gold & AED rates', refreshRates_);
+}
+
+/**
+ * Each rate on its own: one that fails to fetch, or comes back far from its
+ * previous value, keeps the previous value and is reported as a warning. Only
+ * when every rate fails does the run count as an error.
+ */
+function refreshRates_(warn) {
   const sh = SpreadsheetApp.getActive().getSheetByName(RATES_TAB) || setupRatesFeed();
-  const failed = [];
+  let fresh = 0;
   const put = (label, fetch) => {
     try {
       const r = fetch();
+      const row = rateRow_(sh, label);
+      const was = sh.getRange(row, 2).getValue();
+      if (!(r.value > 0)) throw new Error('got ' + r.value);
+      if (typeof was === 'number' && was > 0 && Math.abs(r.value / was - 1) > RATE_MAX_JUMP) {
+        throw new Error(r.value + ' is far from the previous ' + was + '; kept the previous value. Check ' + r.source + ', then refresh again');
+      }
       const date = r.ymd ? rateDay_(r.ymd) : new Date();
-      sh.getRange(rateRow_(sh, label), 2, 1, 4).setValues([[r.value, r.source, date, new Date()]]);
+      sh.getRange(row, 2, 1, 4).setValues([[r.value, r.source, date, new Date()]]);
+      fresh++;
     } catch (e) {
-      failed.push(label + ': ' + e.message);
+      warn(label + ' not refreshed: ' + e.message + '.');
     }
   };
   put(GOLD_LABEL, fetchGold22_);
   put(GOLD999_LABEL, fetchGold999_);
   put(AED_LABEL, () => fetchAedInr_(sh));
-  if (failed.length) throw new Error('Rates not refreshed — ' + failed.join('; '));
+  if (!fresh) throw new Error('No rate could be refreshed, so the previous ones were kept.');
 }
 
 /* ---------- 22C gold, India (Gulf News) ---------- */

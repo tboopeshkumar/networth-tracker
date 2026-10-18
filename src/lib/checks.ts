@@ -9,6 +9,49 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
   const out: Check[] = [];
   const R = model.rows;
 
+  // What the sheet scripts reported about their last run. A failed feed keeps
+  // its previous values, so nothing on screen would look wrong without this.
+  for (const f of model.feeds) {
+    const kept = f.lastSuccess ? ` Values from ${fmtDate(f.lastSuccess)} are kept.` : '';
+    if (f.status === 'Error') {
+      out.push({ id: `feed-${f.feed}`, title: `${f.feed} didn’t refresh${f.lastRun ? ` on ${fmtDate(f.lastRun)}` : ''}.`, detail: `${f.message}${kept}` });
+    } else if (f.status === 'Warning') {
+      out.push({ id: `feed-${f.feed}`, title: `${f.feed} refreshed, with something to check.`, detail: f.message });
+    }
+    // A run that stopped happening at all (its schedule was removed, or it keeps timing out)
+    if (f.lastRun && todaySerial() - f.lastRun > 3) {
+      out.push({ id: `feed-stopped-${f.feed}`, title: `${f.feed} hasn’t run since ${fmtDate(f.lastRun)}.`, detail: 'In the sheet, run it from the Net Worth menu to see why, then reinstall its daily schedule from the same menu.' });
+    }
+  }
+  const reported = (feed: string) => model.feeds.some((f) => f.feed === feed);
+
+  // Holdings that have units but no price: a missing NAV, whatever the cause
+  const unpricedNps = R.nps.filter((r) => n0(r.units) > 0 && !(n0(r.value) > 0));
+  if (unpricedNps.length) {
+    out.push({
+      id: 'nps-unpriced',
+      title: `NPS shows no value for ${unpricedNps.length} scheme${unpricedNps.length > 1 ? 's' : ''} that ${unpricedNps.length > 1 ? 'have' : 'has'} units.`,
+      detail: `${unpricedNps.map((r) => String(r.scheme || r.schemeId)).join(', ')}: no NAV in the NPS Feed tab. In the sheet, use Net Worth → Refresh NPS now.`,
+    });
+  }
+  const mfUnits = model.tables.mf.cols.units !== undefined;
+  const unpricedMf = mfUnits ? (R.mf as (typeof R.mf[number] & { units?: unknown })[]).filter((r) => n0(r.units) > 0 && !(n0(r.current) > 0)) : [];
+  if (unpricedMf.length) {
+    out.push({
+      id: 'mf-unpriced',
+      title: `${unpricedMf.length} mutual fund${unpricedMf.length > 1 ? 's show' : ' shows'} no value despite having units.`,
+      detail: `${unpricedMf.map((r) => String(r.fund)).join(', ')}: no NAV in the NAV Feed tab. Check the AMFI code, then use Net Worth → Refresh NAVs now.`,
+    });
+  }
+  const zeroed = R.networth.filter((r) => n0(r.invested) > 0 && n0(r.current) === 0);
+  if (zeroed.length) {
+    out.push({
+      id: 'line-zero',
+      title: `${zeroed.map((r) => String(r.asset)).join(', ')} ${zeroed.length > 1 ? 'are' : 'is'} worth ₹0 on the Net Worth tab, though money is invested.`,
+      detail: 'Usually a price that didn’t load. Open the line under All positions to see which holding is missing its value.',
+    });
+  }
+
   for (const [id, field, name] of [['mf', 'current', 'Mutual Funds'], ['equity', 'currentInr', 'Equity'], ['sgb', 'market', 'Gold (SGB)'], ['fd', 'amount', 'Fixed Deposits']] as const) {
     const d = totalDrift(model, values, id, field);
     if (d) {
@@ -88,7 +131,7 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
   // A daily broker feed stopped (key or token expired, API change...)
   for (const [feed, name, fix] of [[model.etoro, 'eToro', 'Set eToro keys'], [model.ibkr, 'IBKR', 'Set IBKR token']] as const) {
     const at = feed?.refreshed;
-    if (isNum(at) && todaySerial() - at > 3) {
+    if (isNum(at) && todaySerial() - at > 3 && !reported(name)) {
       out.push({
         id: `${name.toLowerCase()}-feed`,
         title: `${name} positions haven’t refreshed since ${fmtDate(at)}.`,
@@ -99,7 +142,7 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
 
   // The daily Rates Feed script stopped (trigger removed, source page changed...)
   const lastFeed = Math.max(...model.ratesFeed.map((f) => f.refreshed).filter(isNum));
-  if (Number.isFinite(lastFeed) && todaySerial() - lastFeed > 3) {
+  if (Number.isFinite(lastFeed) && todaySerial() - lastFeed > 3 && !reported('Gold & AED rates')) {
     out.push({
       id: 'rates-feed',
       title: `Gold and AED rates haven’t refreshed since ${fmtDate(lastFeed)}.`,
@@ -109,7 +152,7 @@ export function runChecks(model: Model, values: Grids, canEdit: boolean): Check[
 
   // The nightly Daily Log script stopped: "what changed" would compare against an old day
   const lastLog = model.daily.at(-1)?.day;
-  if (lastLog !== undefined && todaySerial() - lastLog > 2) {
+  if (lastLog !== undefined && todaySerial() - lastLog > 2 && !reported('Daily log')) {
     out.push({
       id: 'daily-log',
       title: `The daily log hasn’t recorded since ${fmtDate(lastLog)}.`,
