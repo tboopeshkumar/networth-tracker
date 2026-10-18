@@ -10,6 +10,7 @@ import { Checks } from './Checks';
 import { Holdings } from './Holdings';
 import { Movers, MoversOverTime } from './Movers';
 import { Positions } from './Positions';
+import { PriceMovements } from './PriceMovements';
 import { RatesInputs } from './RatesInputs';
 import { Summary } from './Summary';
 
@@ -70,6 +71,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
       <Holdings model={model} canEdit={canEdit} onEdit={onEdit} except={['Cash']}
         open={open} onToggle={toggle} flash={flash} sectionRef={sectionRef} />
       <RatesInputs model={model} canEdit={canEdit} onEdit={onEdit} />
+      {/* The rates and gold valuation over the last month, for sheets that keep a Rates History */}
+      <PriceMovements model={model} />
       <Checks model={model} values={data.values} canEdit={canEdit} />
 
       <Card

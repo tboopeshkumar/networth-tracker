@@ -16,6 +16,7 @@ class Sheet {
   constructor(rows: Grid = []) { this.rows = rows.map((r) => [...r]); }
   getDataRange() { return { getValues: () => this.rows.map((r) => [...r]) }; }
   getLastRow() { let n = this.rows.length; while (n && this.rows[n - 1].every((v) => v === '')) n--; return n; }
+  getLastColumn() { return Math.max(0, ...this.rows.map((r) => { let n = r.length; while (n && r[n - 1] === '') n--; return n; })); }
   cell(r: number, c: number): Cell { return this.rows[r - 1]?.[c - 1] ?? ''; }
   set(r: number, c: number, v: Cell) {
     while (this.rows.length < r) this.rows.push([]);
@@ -162,6 +163,36 @@ test('Rates: a failed source or a far-off value keeps the previous rate', () => 
   const r = sheets['Rates Feed'].rows;
   assert.deepEqual([r[1][1], r[2][1], r[3][1]], [10000, 12000, 26.2]);
   assert.equal(status(sheets, 'Gold & AED rates')?.[1], 'Warning');
+});
+
+test('Rates History: the first run fills in the month, later runs add days without dropping any', () => {
+  const sheets: Record<string, Sheet> = { 'Rates Feed': new Sheet([['Rate', 'Value', 'Source', 'Rate date', 'Refreshed'], ['Gold 22C (₹/g)', 13600, 's', 'x', 'x'], ['Gold 999 (₹/g)', 14800, 's', 'x', 'x'], ['AED → INR', 26.1, 's', 'x', 'x']]) };
+  const s = scripts(sheets, () => ({ code: 500 }));
+  s.fetchGold22_ = () => ({ value: 13535, ymd: [2026, 10, 18], source: 'Gulf News', history: [{ ymd: [2026, 10, 18], value: 13535 }, { ymd: [2026, 10, 17], value: 13560 }, { ymd: [2026, 9, 19], value: 14285 }] });
+  s.fetchGold999_ = () => ({ value: 14765, ymd: [2026, 10, 17], source: 'IBJA' });
+  s.fetchAedInr_ = () => ({ value: 26.12, ymd: null, source: 'Google Finance' });
+  s.fetchAedHistory_ = () => [{ key: '2026-10-16', value: 26.05 }, { key: '2026-10-17', value: 26.08 }];
+  runInNewContext('refreshRates()', s);
+
+  const tab = () => sheets['Rates History'].rows.filter((r) => r.some((v) => v !== ''));
+  const head = tab()[0];
+  assert.deepEqual(head, ['Date', 'AED → INR', 'Gold 22C (₹/g)', 'Gold 999 (₹/g)']);
+  const byDay = () => Object.fromEntries(tab().slice(1).map((r) => [r[0], r.slice(1)]));
+  const days = byDay();
+  assert.deepEqual(Object.keys(days), [...Object.keys(days)].sort(), 'in date order');
+  assert.deepEqual(days['2026-09-19'], ['', 14285, ''], 'a month back, from the page');
+  assert.deepEqual(days['2026-10-17'], [26.08, 13560, 14765]);
+  assert.equal(days['2026-10-16'][0], 26.05);
+
+  // A later run whose AED history fails: what's there stays, the day's values are added
+  s.fetchAedHistory_ = () => { throw new Error('Google Finance returned no history'); };
+  s.fetchGold22_ = () => ({ value: 13500, ymd: [2026, 10, 19], source: 'Gulf News', history: [{ ymd: [2026, 10, 19], value: 13500 }] });
+  runInNewContext('refreshRates()', s);
+  const later = byDay();
+  assert.deepEqual(later['2026-09-19'], ['', 14285, '']);
+  assert.equal(later['2026-10-16'][0], 26.05);
+  assert.equal(later['2026-10-19'][1], 13500);
+  assert.equal(status(sheets, 'Gold & AED rates')?.[1], 'Warning', 'the missing history is reported');
 });
 
 /* ---------- brokers ---------- */

@@ -12,6 +12,12 @@
  *   A Rate   B Value   C Source   D Rate date   E Refreshed
  * Point the cells that use a rate at it, for example
  *   =VLOOKUP("Gold 22C (₹/g)", 'Rates Feed'!A:B, 2, FALSE)
+ * Each day's rates are also kept in a "Rates History" tab, one row per day:
+ *   A Date (text, yyyy-mm-dd)   B AED → INR   C Gold 22C (₹/g)   D Gold 999 (₹/g)
+ * The first run fills in about a month at once: Gulf News lists 30 days of
+ * 22C prices, and Google Finance has past USD → INR closes. The web app
+ * charts it. Rows older than 400 days are removed.
+ *
  * A rate that fails to fetch, or comes back far from its previous value,
  * keeps its previous value, so nothing that depends on it breaks; column E
  * then shows the last good refresh, and the Feed Status tab says why.
@@ -25,6 +31,11 @@ const AED_LABEL = 'AED → INR';
 const GOLD_URL = 'https://gulfnews.com/gold-forex/india-gold-prices';
 const IBJA_URL = 'https://ibjarates.com/';
 const AED_USD_PEG = 3.6725;
+const HISTORY_TAB = 'Rates History';
+const HISTORY_LABELS = [AED_LABEL, GOLD_LABEL, GOLD999_LABEL];
+const HISTORY_KEEP_DAYS = 400;
+// The rates are Indian ones, refreshed on an IST schedule: their days are IST days
+const RATES_ZONE = 'Asia/Kolkata';
 
 function setupRatesFeed() {
   const ss = SpreadsheetApp.getActive();
@@ -62,10 +73,16 @@ function refreshRates() {
  */
 function refreshRates_(warn) {
   const sh = SpreadsheetApp.getActive().getSheetByName(RATES_TAB) || setupRatesFeed();
+  const today = Utilities.formatDate(new Date(), RATES_ZONE, 'yyyy-MM-dd');
+  // label → { 'yyyy-mm-dd': value }, for the Rates History tab
+  const history = {};
+  const keep = (label, key, value) => { (history[label] = history[label] || {})[key] = value; };
   let fresh = 0;
   const put = (label, fetch) => {
     try {
       const r = fetch();
+      // A source's own dated history goes in even when today's value is held back below
+      for (const h of r.history || []) keep(label, dayKey_(h.ymd), h.value);
       const row = rateRow_(sh, label);
       const was = sh.getRange(row, 2).getValue();
       if (!(r.value > 0)) throw new Error('got ' + r.value);
@@ -74,6 +91,7 @@ function refreshRates_(warn) {
       }
       const date = r.ymd ? rateDay_(r.ymd) : new Date();
       sh.getRange(row, 2, 1, 4).setValues([[r.value, r.source, date, new Date()]]);
+      keep(label, r.ymd ? dayKey_(r.ymd) : today, r.value);
       fresh++;
     } catch (e) {
       warn(label + ' not refreshed: ' + e.message + '.');
@@ -83,6 +101,58 @@ function refreshRates_(warn) {
   put(GOLD999_LABEL, fetchGold999_);
   put(AED_LABEL, () => fetchAedInr_(sh));
   if (!fresh) throw new Error('No rate could be refreshed, so the previous ones were kept.');
+
+  try {
+    for (const h of fetchAedHistory_(sh)) if (!(history[AED_LABEL] && history[AED_LABEL][h.key])) keep(AED_LABEL, h.key, h.value);
+  } catch (e) {
+    warn('Past AED → INR rates not fetched: ' + e.message + '.');
+  }
+  try {
+    updateRateHistory_(history);
+  } catch (e) {
+    warn('Rates History not updated: ' + e.message + '.');
+  }
+}
+
+/** "yyyy-mm-dd" for a [y, m, d] day. */
+const dayKey_ = ([y, m, d]) => y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+
+/**
+ * Merges new values into the Rates History tab, one row per day. Values
+ * already there stay unless the same day has a new one; nothing is removed
+ * but rows older than HISTORY_KEEP_DAYS.
+ *   history: label → { 'yyyy-mm-dd': value }
+ */
+function updateRateHistory_(history) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(HISTORY_TAB) || ss.insertSheet(HISTORY_TAB);
+  const headers = ['Date', ...HISTORY_LABELS];
+  const rows = {};
+  const last = sh.getLastRow();
+  const width = Math.max(sh.getLastColumn(), headers.length);
+  if (last > 1) {
+    const vals = sh.getRange(1, 1, last, width).getValues();
+    const head = vals[0].map((h) => String(h).trim());
+    for (const r of vals.slice(1)) {
+      const key = String(r[0]).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+      rows[key] = rows[key] || {};
+      head.forEach((h, i) => { if (i && h && typeof r[i] === 'number') rows[key][h] = r[i]; });
+    }
+  }
+  for (const label of Object.keys(history)) {
+    for (const key of Object.keys(history[label])) (rows[key] = rows[key] || {})[label] = history[label][key];
+  }
+  const cutoff = Utilities.formatDate(new Date(Date.now() - HISTORY_KEEP_DAYS * 86400000), RATES_ZONE, 'yyyy-MM-dd');
+  const keys = Object.keys(rows).filter((k) => k >= cutoff).sort();
+  const out = [headers, ...keys.map((k) => [k, ...HISTORY_LABELS.map((l) => (l in rows[k] ? rows[k][l] : ''))])];
+
+  // Text, so a date is the same day whatever zone reads it
+  sh.getRange('A:A').setNumberFormat('@');
+  if (last) sh.getRange(1, 1, last, width).clearContent();
+  sh.getRange(1, 1, out.length, headers.length).setValues(out);
+  sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sh.setFrozenRows(1);
 }
 
 /* ---------- 22C gold, India (Gulf News) ---------- */
@@ -106,11 +176,11 @@ function parseGold22_(html) {
     const head = rows[0] || [];
     const col = head.findIndex((c) => /^22\s*carat/i.test(c));
     if (col < 0 || !/^date$/i.test(head[0] || '')) continue;
-    for (const r of rows.slice(1)) {
-      const ymd = parseDayMonth_(r[0]);
-      const value = number(r[col]);
-      if (ymd && value > 0) return { value, ymd, source: 'Gulf News' };
-    }
+    // Newest first; every dated row also goes into the Rates History tab
+    const history = rows.slice(1)
+      .map((r) => ({ ymd: parseDayMonth_(r[0]), value: number(r[col]) }))
+      .filter((h) => h.ymd && h.value > 0);
+    if (history.length) return { value: history[0].value, ymd: history[0].ymd, source: 'Gulf News', history };
   }
 
   // Fallback: today's table, latest of morning/afternoon/evening
@@ -187,6 +257,28 @@ function fetchAedInr_(sh) {
     const usdInr = cell.getValue();
     if (typeof usdInr !== 'number' || !(usdInr > 0)) throw new Error('Google Finance gave ' + usdInr);
     return { value: usdInr / AED_USD_PEG, ymd: null, source: 'Google Finance' };
+  } finally {
+    cell.clearContent();
+  }
+}
+
+/**
+ * Past USD → INR closes from Google Finance, over the AED peg: about the last
+ * five weeks. Evaluated in spare cells of this tab, read as text dates and
+ * numbers, and cleared, like fetchAedInr_.
+ *   → [{ key: 'yyyy-mm-dd', value }]
+ */
+function fetchAedHistory_(sh) {
+  const cell = sh.getRange(1, RATES_HEADERS.length + 4);
+  try {
+    cell.setFormula('=LET(g, GOOGLEFINANCE("CURRENCY:USDINR", "price", TODAY()-35, TODAY()), '
+      + '{ARRAYFORMULA(IFERROR(TEXT(INDEX(g, 0, 1), "yyyy-mm-dd"), "")), ARRAYFORMULA(IFERROR(INDEX(g, 0, 2) / ' + AED_USD_PEG + ', ""))})');
+    SpreadsheetApp.flush();
+    const out = sh.getRange(1, RATES_HEADERS.length + 4, 45, 2).getValues()
+      .filter(([k, v]) => /^\d{4}-\d{2}-\d{2}$/.test(String(k)) && typeof v === 'number' && v > 0)
+      .map(([k, v]) => ({ key: String(k), value: v }));
+    if (!out.length) throw new Error('Google Finance returned no history');
+    return out;
   } finally {
     cell.clearContent();
   }

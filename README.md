@@ -271,6 +271,10 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
+### Price history
+
+`RatesFeed.gs` also keeps a `Rates History` tab: one row per day with AED → INR, Gold 22C and Gold 999. Its first run fills in about a month at once (Gulf News lists 30 days of 22C prices, and Google Finance has past USD → INR closes); after that each daily refresh adds a row, and rows older than 400 days are removed. The app charts the last 30 days under **Price movements**: the AED → INR rate, and the gold valuation (your grams × that day's 22C rate). No setup beyond pasting the updated `RatesFeed.gs` and running **Refresh gold & AED rates now** once.
+
 ### Daily NPS NAVs
 
 The same `NavFeed.gs` also prices NPS from NPS Trust's daily NAV report (`npstrust.org.in/nav-report-excel`, every scheme with its Scheme ID). On the NPS tab, add a holdings table headed **Scheme ID | Scheme | Units | NAV | Value | NAV date**, one row per scheme you hold (IDs such as `SM001004`; "POP" is the route you invested through, not a separate scheme). NAV, Value and NAV date are formulas over an `NPS Feed` tab the script rewrites. Point *Gain* at `=SUM(<values>)-<invested>` and *As of* at `=MIN(<nav dates>)`; Net Worth keeps reading Invested and Current Value as before. **Net Worth → Refresh NPS now** runs it once; afterwards it rides on the daily NAV refresh.

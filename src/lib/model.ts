@@ -11,6 +11,7 @@ import { RATES_TAB, readRatesFeed, type FeedRate } from './ratesFeed';
 import { ETORO_TAB, IBKR_TAB, readBrokerFeed, type BrokerFeed } from './brokerFeed';
 import { DAILY_TAB, readDailyLog, type DaySnapshot } from './dailyLog';
 import { STATUS_TAB, readFeedStatus, type FeedRun } from './feedStatus';
+import { HISTORY_TAB, readRateHistory, type RatePoint } from './rateHistory';
 
 export type Grid = Cell[][];
 export type Grids = Record<string, Grid>;
@@ -141,7 +142,7 @@ export const SPECS = {
 };
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -239,6 +240,8 @@ export interface Model {
   daily: DaySnapshot[];
   /** How each sheet script's last run went, if the sheet has a Feed Status tab. */
   feeds: FeedRun[];
+  /** Each rate's past days (label → points), if the sheet keeps a Rates History tab. */
+  rateHistory: Record<string, RatePoint[]>;
 }
 
 /** A family-loan ledger's entries, addressed like a table: "ledger:" + its tab's name. */
@@ -480,7 +483,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]), daily: readDailyLog(values[DAILY_TAB]), feeds: readFeedStatus(values[STATUS_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]), daily: readDailyLog(values[DAILY_TAB]), feeds: readFeedStatus(values[STATUS_TAB]), rateHistory: readRateHistory(values[HISTORY_TAB]) };
 }
 
 /**
