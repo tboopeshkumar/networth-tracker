@@ -70,10 +70,35 @@ function versionFile(): Plugin {
   };
 }
 
+// The service worker (sw/service-worker.js), with this build's version and the
+// files the first screen needs: the page, its entry script and styles, the
+// manifest and icons. Everything else is stored the first time it's used.
+function serviceWorker(): Plugin {
+  return {
+    name: 'service-worker',
+    apply: 'build',
+    async generateBundle(_, bundle) {
+      const files = new Set(['./', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'apple-touch-icon.png']);
+      for (const out of Object.values(bundle)) {
+        if (out.type !== 'chunk' || !out.isEntry) continue;
+        files.add(out.fileName);
+        out.imports.forEach((f) => files.add(f));
+        out.viteMetadata?.importedCss.forEach((f) => files.add(f));
+      }
+      const code = await readFile(new URL('./sw/service-worker.js', import.meta.url), 'utf8');
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: `const VERSION = ${JSON.stringify(`${VERSION}-${BUILT}`)};\nconst PRECACHE = ${JSON.stringify([...files])};\n${code}`,
+      });
+    },
+  };
+}
+
 export default defineConfig({
   // GitHub Pages serves a project site under /<repo>/; the workflow sets this.
   base: process.env.BASE_PATH || '/',
-  plugins: [tailwindcss(), react(), contentSecurityPolicy(), demoFixture(), versionFile()],
+  plugins: [tailwindcss(), react(), contentSecurityPolicy(), demoFixture(), versionFile(), serviceWorker()],
   define: {
     __APP_VERSION__: JSON.stringify(VERSION),
     __APP_BUILT__: JSON.stringify(BUILT),

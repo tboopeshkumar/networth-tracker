@@ -189,6 +189,12 @@ The fixture (`demo/fixture.json`) holds your real data. It is gitignored and blo
 
 ## How it works
 
+### Kept on the device
+
+In production a service worker (`sw/service-worker.js`, built into `sw.js`) keeps the app's own files on the device, so opening it, especially from the Home Screen, shows the stored copy at once instead of downloading it again; a fresh copy is fetched behind it for next time. Reload (and pull to refresh) always fetches from the network, `version.json` is never stored, so the update check still sees new versions, and requests to Google (sign-in, the Sheets API) pass straight through: nothing from your sheet is stored. Each build has its own store and clears the previous one.
+
+To switch it off, replace the body of `sw/service-worker.js` with `self.addEventListener('install', () => self.skipWaiting()); self.addEventListener('activate', () => self.registration.unregister());` and deploy; devices drop it on their next visit.
+
 ### Reading the sheet
 
 The app finds each table by its **header text**, not by fixed cell addresses, and identifies rows by their content (e.g. fund + holder). Rearranging a tab or inserting rows by hand doesn't break it; renaming a header does. The expected headers are in `SPECS` in `src/lib/model.ts`.
