@@ -22,7 +22,7 @@ beforeEach(() => store.clear());
 /** The demo backend, counting its reads (each read is one round of requests). */
 class Counting extends DemoSheets {
   reads: string[][] = [];
-  async read(tabs: readonly string[]) {
+  override async read(tabs: readonly string[]) {
     this.reads.push([...tabs]);
     return super.read(tabs);
   }
