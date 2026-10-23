@@ -24,6 +24,8 @@ export type BatchRequest =
   | { insertRange: { range: GridRange; shiftDimension: 'ROWS' } };
 
 export interface SheetsBackend {
+  /** identifies the spreadsheet, e.g. to remember its tab names between loads */
+  readonly id: string;
   readonly title: string;
   meta(): Promise<SheetMeta[]>;
   read(tabs: readonly string[]): Promise<SheetData>;
@@ -32,6 +34,8 @@ export interface SheetsBackend {
 }
 
 export class AuthError extends Error {}
+/** A requested tab doesn't exist (renamed or deleted); Google rejects the whole read. */
+export class MissingTabError extends Error {}
 export class AccessError extends Error {}
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -40,7 +44,7 @@ const quote = (tab: string) => `'${tab.replace(/'/g, "''")}'`;
 export class GoogleSheets implements SheetsBackend {
   title = 'your sheet';
 
-  constructor(private readonly id: string, private readonly getToken: () => string | null) {}
+  constructor(readonly id: string, private readonly getToken: () => string | null) {}
 
   private async call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = this.getToken();
@@ -53,7 +57,11 @@ export class GoogleSheets implements SheetsBackend {
     if (res.status === 403 || res.status === 404) {
       throw new AccessError('This Google account can’t open that sheet — or can only view it. Pick it again, or check how it is shared with you.');
     }
-    if (!res.ok) throw new Error(`Sheets API ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 300);
+      if (res.status === 400 && /unable to parse range/i.test(body)) throw new MissingTabError(body);
+      throw new Error(`Sheets API ${res.status}: ${body}`);
+    }
     return res.json() as Promise<T>;
   }
 

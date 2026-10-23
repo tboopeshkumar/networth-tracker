@@ -8,7 +8,8 @@
 
 import { a1, colLetter, isNum, n0, type Cell } from './format';
 import { OPTIONAL_TABS, TABS, buildModel, detailSheets, rowsOf, tableOf, type Model, type Row, type TableId } from './model';
-import type { BatchRequest, SheetData, SheetMeta, SheetsBackend, UserEnteredValue } from './sheets';
+import { rememberTabs, rememberedTabs } from './tabCache';
+import { MissingTabError, type BatchRequest, type SheetData, type SheetMeta, type SheetsBackend, type UserEnteredValue } from './sheets';
 
 export class ConflictError extends Error {
   constructor(message: string, readonly details: string[] = []) { super(message); }
@@ -104,17 +105,43 @@ const shown = (v: unknown) => (v === null || v === undefined || v === '' ? '—'
 
 export interface Loaded { meta: SheetMeta[]; data: SheetData; model: Model }
 
+/**
+ * Reads every tab the app uses. Besides the fixed ones, that's the ledger tabs
+ * Receivables points at and the optional tabs this sheet has, which are only
+ * known once the tab list and Receivables have arrived. So the extra tabs from
+ * the last load are asked for up front, in the same round; a second round
+ * fetches only what's new since. A remembered tab that was renamed or deleted
+ * fails the read, and it's done again the long way.
+ */
 export async function loadAll(backend: SheetsBackend): Promise<Loaded> {
-  const [meta, data] = await Promise.all([backend.meta(), backend.read(TABS)]);
-  // Second pass: ledger tabs referenced from Receivables, and optional tabs
-  // such as the jewellery register — only those that exist in this sheet
+  const fixed = TABS as readonly string[];
+  const known = rememberedTabs(backend.id).filter((t) => !fixed.includes(t));
+  let meta: SheetMeta[];
+  let data: SheetData;
+  try {
+    [meta, data] = await Promise.all([backend.meta(), backend.read([...fixed, ...known])]);
+  } catch (e) {
+    if (!(e instanceof MissingTabError) || !known.length) throw e;
+    rememberTabs(backend.id, null);
+    return loadAll(backend);
+  }
+
+  // Ledger tabs referenced from Receivables, and optional tabs such as the
+  // jewellery register: only those that exist in this sheet
   const extra = [...new Set([...detailSheets(data.values), ...OPTIONAL_TABS])]
-    .filter((t) => !(TABS as readonly string[]).includes(t) && meta.some((m) => m.title === t));
-  if (extra.length) {
-    const more = await backend.read(extra);
+    .filter((t) => !fixed.includes(t) && meta.some((m) => m.title === t));
+  const missing = extra.filter((t) => !known.includes(t));
+  if (missing.length) {
+    const more = await backend.read(missing);
     Object.assign(data.values, more.values);
     Object.assign(data.formulas, more.formulas);
   }
+  // Read up front but no longer used (a ledger no longer linked): left out, as on a first load
+  for (const t of known.filter((k) => !extra.includes(k))) {
+    delete data.values[t];
+    delete data.formulas[t];
+  }
+  rememberTabs(backend.id, extra);
   return { meta, data, model: buildModel(data.values, data.formulas) };
 }
 

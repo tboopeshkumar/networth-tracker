@@ -7,7 +7,7 @@
 
 import { colIndex, type Cell } from './format';
 import type { Grid, Grids } from './model';
-import type { BatchRequest, SheetData, SheetMeta, SheetsBackend } from './sheets';
+import { MissingTabError, type BatchRequest, type SheetData, type SheetMeta, type SheetsBackend } from './sheets';
 
 export interface Fixture { sheets: SheetMeta[]; values: Grids; formulas: Grids }
 
@@ -47,6 +47,7 @@ function evalSimple(formula: string, grid: Grid): Cell {
 }
 
 export class DemoSheets implements SheetsBackend {
+  readonly id = 'demo';
   readonly title = 'Demo (local fixture)';
   f: Fixture;
 
@@ -61,6 +62,9 @@ export class DemoSheets implements SheetsBackend {
   async meta() { return clone(this.f.sheets); }
 
   async read(tabs: readonly string[]): Promise<SheetData> {
+    // Like Google, a read naming a tab the sheet doesn't have fails as a whole
+    const missing = tabs.find((t) => !this.f.sheets.some((s) => s.title === t));
+    if (missing) throw new MissingTabError(`Unable to parse range: '${missing}'`);
     return {
       values: Object.fromEntries(tabs.map((t) => [t, clone(this.f.values[t] ?? [])])),
       formulas: Object.fromEntries(tabs.map((t) => [t, clone(this.f.formulas[t] ?? [])])),

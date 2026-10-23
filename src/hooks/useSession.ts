@@ -3,6 +3,7 @@ import { CONFIG, isConfigured } from '../config';
 import { accessFor } from '../lib/access';
 import { disconnect, getToken, initAuth, signIn, signOut } from '../lib/auth';
 import { parseSheetId, pickSpreadsheet, rememberSheet, rememberedSheet } from '../lib/picker';
+import { forgetAllTabs } from '../lib/tabCache';
 import { AccessError, AuthError, GoogleSheets, type SheetsBackend } from '../lib/sheets';
 import { execute, loadAll, type Loaded, type Plan } from '../lib/writer';
 
@@ -163,6 +164,7 @@ export function useSession(toast: Toast) {
   const revoke = useCallback(() => {
     if (!window.confirm('Revoke this app’s access to your Google account? You will need to sign in and pick the sheet again.')) return;
     if (identity) rememberSheet(identity.email, null);
+    forgetAllTabs();
     disconnect();
     lock('Access revoked.');
   }, [identity, lock]);
