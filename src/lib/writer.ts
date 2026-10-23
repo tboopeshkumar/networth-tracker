@@ -7,7 +7,7 @@
 // ONE spreadsheets.batchUpdate, which Google applies atomically.
 
 import { a1, colLetter, isNum, n0, type Cell } from './format';
-import { OPTIONAL_TABS, TABS, buildModel, detailSheets, rowsOf, tableOf, type Model, type Row, type TableId } from './model';
+import { OPTIONAL_TABS, TABS, VALUES_ONLY_TABS, buildModel, detailSheets, rowsOf, tableOf, type Model, type Row, type TableId } from './model';
 import { rememberTabs, rememberedTabs } from './tabCache';
 import { MissingTabError, type BatchRequest, type SheetData, type SheetMeta, type SheetsBackend, type UserEnteredValue } from './sheets';
 
@@ -119,7 +119,7 @@ export async function loadAll(backend: SheetsBackend): Promise<Loaded> {
   let meta: SheetMeta[];
   let data: SheetData;
   try {
-    [meta, data] = await Promise.all([backend.meta(), backend.read([...fixed, ...known])]);
+    [meta, data] = await Promise.all([backend.meta(), backend.read([...fixed, ...known], VALUES_ONLY_TABS)]);
   } catch (e) {
     if (!(e instanceof MissingTabError) || !known.length) throw e;
     rememberTabs(backend.id, null);
@@ -132,7 +132,7 @@ export async function loadAll(backend: SheetsBackend): Promise<Loaded> {
     .filter((t) => !fixed.includes(t) && meta.some((m) => m.title === t));
   const missing = extra.filter((t) => !known.includes(t));
   if (missing.length) {
-    const more = await backend.read(missing);
+    const more = await backend.read(missing, VALUES_ONLY_TABS);
     Object.assign(data.values, more.values);
     Object.assign(data.formulas, more.formulas);
   }

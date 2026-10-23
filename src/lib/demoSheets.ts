@@ -61,13 +61,15 @@ export class DemoSheets implements SheetsBackend {
 
   async meta() { return clone(this.f.sheets); }
 
-  async read(tabs: readonly string[]): Promise<SheetData> {
+  async read(tabs: readonly string[], valuesOnly: readonly string[] = []): Promise<SheetData> {
     // Like Google, a read naming a tab the sheet doesn't have fails as a whole
     const missing = tabs.find((t) => !this.f.sheets.some((s) => s.title === t));
     if (missing) throw new MissingTabError(`Unable to parse range: '${missing}'`);
+    const values = Object.fromEntries(tabs.map((t) => [t, clone(this.f.values[t] ?? [])]));
     return {
-      values: Object.fromEntries(tabs.map((t) => [t, clone(this.f.values[t] ?? [])])),
-      formulas: Object.fromEntries(tabs.map((t) => [t, clone(this.f.formulas[t] ?? [])])),
+      values,
+      // As the real backend: a values-only tab's formulas are its values
+      formulas: Object.fromEntries(tabs.map((t) => [t, valuesOnly.includes(t) ? values[t] : clone(this.f.formulas[t] ?? [])])),
     };
   }
 

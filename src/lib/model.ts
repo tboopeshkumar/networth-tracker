@@ -141,6 +141,13 @@ export const SPECS = {
   }),
 };
 
+/**
+ * Tabs only the sheet scripts write, which the app reads but never edits: their
+ * formulas aren't needed, so only their values are downloaded. Daily Log and
+ * Rates History grow by the day, which is where this counts.
+ */
+export const VALUES_ONLY_TABS: readonly string[] = [RATES_TAB, ETORO_TAB, IBKR_TAB, DAILY_TAB, STATUS_TAB, HISTORY_TAB];
+
 /** Read when present; a sheet without them still loads. */
 export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB] as const;
 

@@ -22,9 +22,9 @@ beforeEach(() => store.clear());
 /** The demo backend, counting its reads (each read is one round of requests). */
 class Counting extends DemoSheets {
   reads: string[][] = [];
-  override async read(tabs: readonly string[]) {
+  override async read(tabs: readonly string[], valuesOnly?: readonly string[]) {
     this.reads.push([...tabs]);
-    return super.read(tabs);
+    return super.read(tabs, valuesOnly);
   }
 }
 const fixture = (): Fixture => JSON.parse(readFileSync(FIX, 'utf8')) as Fixture;

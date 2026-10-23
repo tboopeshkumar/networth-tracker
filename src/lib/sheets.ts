@@ -28,7 +28,11 @@ export interface SheetsBackend {
   readonly id: string;
   readonly title: string;
   meta(): Promise<SheetMeta[]>;
-  read(tabs: readonly string[]): Promise<SheetData>;
+  /**
+   * Values and formulas of each tab. Tabs in `valuesOnly` skip the formulas
+   * download; their formulas grid is their values grid.
+   */
+  read(tabs: readonly string[], valuesOnly?: readonly string[]): Promise<SheetData>;
   /** Applies all requests atomically. */
   batchUpdate(requests: BatchRequest[]): Promise<unknown>;
 }
@@ -72,16 +76,24 @@ export class GoogleSheets implements SheetsBackend {
     return r.sheets.map((s) => s.properties);
   }
 
-  async read(tabs: readonly string[]): Promise<SheetData> {
+  async read(tabs: readonly string[], valuesOnly: readonly string[] = []): Promise<SheetData> {
     type Resp = { valueRanges: { values?: Grids[string] }[] };
-    const get = (render: 'UNFORMATTED_VALUE' | 'FORMULA') => {
+    const get = (render: 'UNFORMATTED_VALUE' | 'FORMULA', of: readonly string[]) => {
       const p = new URLSearchParams({ valueRenderOption: render, dateTimeRenderOption: 'SERIAL_NUMBER' });
-      tabs.forEach((t) => p.append('ranges', quote(t)));
+      of.forEach((t) => p.append('ranges', quote(t)));
       return this.call<Resp>(`/values:batchGet?${p}`);
     };
-    const [vals, forms] = await Promise.all([get('UNFORMATTED_VALUE'), get('FORMULA')]);
-    const pack = (r: Resp): Grids => Object.fromEntries(tabs.map((t, i) => [t, r.valueRanges[i]?.values ?? []]));
-    return { values: pack(vals), formulas: pack(forms) };
+    const pack = (r: Resp | null, of: readonly string[]): Grids => Object.fromEntries(of.map((t, i) => [t, r?.valueRanges[i]?.values ?? []]));
+    // Formulas only matter where the app edits; a tab only the scripts write is plain values
+    const withFormulas = tabs.filter((t) => !valuesOnly.includes(t));
+    const [vals, forms] = await Promise.all([
+      get('UNFORMATTED_VALUE', tabs),
+      withFormulas.length ? get('FORMULA', withFormulas) : Promise.resolve(null),
+    ]);
+    const values = pack(vals, tabs);
+    const formulas = pack(forms, withFormulas);
+    for (const t of tabs) if (!(t in formulas)) formulas[t] = values[t];
+    return { values, formulas };
   }
 
   batchUpdate(requests: BatchRequest[]) {
