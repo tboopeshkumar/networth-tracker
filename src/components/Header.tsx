@@ -1,5 +1,5 @@
-import { IconDots, IconMoon, IconRefresh, IconReload, IconSun } from '@tabler/icons-react';
-import { useEffect, useRef } from 'react';
+import { IconCheck, IconDots, IconMoon, IconRefresh, IconReload, IconSun } from '@tabler/icons-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { BUILT, VERSION, reloadApp } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
@@ -13,7 +13,8 @@ interface Props {
   demo: boolean;
   /** a newer build is live: the reload button says so */
   updateReady?: boolean;
-  onRefresh: () => void;
+  /** resolves to whether the sheet was read */
+  onRefresh: () => Promise<boolean>;
   onSwitchSheet: () => void;
   onDisconnect: () => void;
   onSignOut: () => void;
@@ -25,6 +26,36 @@ interface Props {
 const builtAt = new Date(BUILT).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 const MENU_ITEM = 'cursor-pointer rounded-md px-2.5 py-2 text-left text-[13px] text-ink hover:bg-sunk';
+
+/** Says how a refresh is going on the button itself: spinning, then a tick for a moment. */
+function RefreshButton({ onRefresh }: { onRefresh: () => Promise<boolean> }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const refresh = async () => {
+    clearTimeout(timer.current);
+    setState('busy');
+    // A failure explains itself in a message; the button just goes back to normal
+    if (await onRefresh()) {
+      setState('done');
+      timer.current = setTimeout(() => setState('idle'), 2000);
+    } else {
+      setState('idle');
+    }
+  };
+
+  const text = state === 'busy' ? 'Refreshing…' : state === 'done' ? 'Up to date' : 'Refresh';
+  return (
+    <button type="button" className={BTN} title="Reload from the sheet" aria-label="Reload from the sheet" disabled={state === 'busy'} onClick={() => void refresh()}>
+      {state === 'done'
+        ? <IconCheck size={16} stroke={2.25} className="text-good" aria-hidden="true" />
+        : <IconRefresh size={16} stroke={1.75} className={state === 'busy' ? 'animate-spin motion-reduce:animate-none' : undefined} aria-hidden="true" />}
+      <span className="hidden sm:inline">{text}</span>
+      <span role="status" className="sr-only">{state === 'done' ? 'Up to date' : ''}</span>
+    </button>
+  );
+}
 
 export function Header({ sheetTitle, email, canEdit, showActions, demo, updateReady, onRefresh, onSwitchSheet, onDisconnect, onSignOut, onExport, onImportCas }: Props) {
   const menu = useRef<HTMLDetailsElement>(null);
@@ -67,10 +98,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, updateRe
       </div>
       <div className="flex flex-none items-center gap-1.5">
         {showActions && (
-          <button type="button" className={BTN} title="Reload from the sheet" aria-label="Reload from the sheet" onClick={onRefresh}>
-            <IconRefresh size={16} stroke={1.75} aria-hidden="true" />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+          <RefreshButton onRefresh={onRefresh} />
         )}
         {/* Refresh re-reads the sheet; this reloads the app itself, for a newer version. The dot means one is waiting. */}
         {showActions && (

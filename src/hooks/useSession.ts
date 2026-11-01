@@ -134,16 +134,17 @@ export function useSession(toast: Toast) {
   }, [identity, lock, open, toast]);
 
   const refresh = useCallback(async () => {
-    if (!session) return;
-    if (!DEMO && !getToken()) { lock(EXPIRED); return; }
+    if (!session) return false;
+    if (!DEMO && !getToken()) { lock(EXPIRED); return false; }
     try {
       const loaded = await loadAll(session.backend);
       setSession({ ...session, loaded });
-      toast('Up to date');
+      return true;
     } catch (e) {
       fail(e);
+      return false;
     }
-  }, [session, lock, fail, toast]);
+  }, [session, lock, fail]);
 
   /** Errors propagate to the editor dialog, which explains them. */
   const write = useCallback(async (plan: Plan) => {

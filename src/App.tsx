@@ -45,7 +45,7 @@ export function App() {
         showActions={!!session}
         updateReady={updateReady}
         // Refreshing the data is also a good moment to look for a newer app
-        onRefresh={() => { checkNow(); void s.refresh(); }}
+        onRefresh={() => { checkNow(); return s.refresh(); }}
         onSwitchSheet={s.switchSheet}
         onDisconnect={s.revoke}
         onSignOut={() => { setEditing(null); s.lock('Signed out.'); }}
