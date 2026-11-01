@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'vitest';
 
 import { PickScreen } from '../src/components/Screens';
+import { ToastCard } from '../src/components/Toast';
 import { Holdings } from '../src/components/dashboard/Holdings';
 import { Positions } from '../src/components/dashboard/Positions';
 import { buildViews, holdersIn, rowsFor } from '../src/components/dashboard/holdingViews';
@@ -94,4 +95,12 @@ test('sections that record a holder can be narrowed to one, and only those', asy
     const chips = html.split('aria-pressed=').length - 1;
     assert.equal(chips, names.length > 1 ? names.length + 1 : 0, `${v.id}: All plus one chip per holder`);
   }
+});
+
+test('messages can be dismissed, and a problem is announced as an alert', () => {
+  const err = renderToStaticMarkup(<ToastCard message="<b>Sheets API 500</b>" kind="err" onDismiss={() => {}} />);
+  assert.ok(err.includes('role="alert"'));
+  assert.ok(err.includes('aria-label="Dismiss"'));
+  assert.ok(err.includes('&lt;b&gt;Sheets API 500'), 'the text is shown literally');
+  assert.ok(renderToStaticMarkup(<ToastCard message="Signed out." kind="info" onDismiss={() => {}} />).includes('role="status"'));
 });

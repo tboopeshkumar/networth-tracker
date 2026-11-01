@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { BUILT, VERSION, reloadApp } from '../hooks/useUpdateCheck';
 import { Logo } from './Logo';
+import { ToastHost } from './Toast';
 import { BTN, cx } from './ui';
 
 interface Props {
@@ -136,6 +137,7 @@ export function Header({ sheetTitle, email, canEdit, showActions, demo, updateRe
           </details>
         )}
       </div>
+      <ToastHost />
     </header>
   );
 }
