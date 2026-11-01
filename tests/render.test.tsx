@@ -104,3 +104,10 @@ test('messages can be dismissed, and a problem is announced as an alert', () => 
   assert.ok(err.includes('&lt;b&gt;Sheets API 500'), 'the text is shown literally');
   assert.ok(renderToStaticMarkup(<ToastCard message="Signed out." kind="info" onDismiss={() => {}} />).includes('role="status"'));
 });
+
+test('table defaults sit in a layer, so emphasis on a cell (up, down, strong) can win', () => {
+  // An unlayered ".tbl td { color }" beats every Tailwind utility, whatever its specificity
+  const css = readFileSync(new URL('../src/styles/app.css', import.meta.url), 'utf8');
+  const layer = css.indexOf('@layer components {');
+  assert.ok(layer >= 0 && layer < css.indexOf('.tbl td {'), '.tbl rules are inside @layer components');
+});

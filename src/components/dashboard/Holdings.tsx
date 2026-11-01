@@ -172,7 +172,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                 <span className="min-w-0 flex-1 font-medium">{c.title}</span>
                 <span className="whitespace-nowrap font-semibold tabular-nums">{c.value}</span>
               </div>
-              <div className="mt-0.5 flex min-h-6 items-center justify-between gap-3 text-xs text-ink-3">
+              <div className="mt-0.5 flex min-h-6 items-center justify-between gap-3 text-xs text-ink-2">
                 <span className="min-w-0">{c.sub}</span>
                 {inlineEdit && <span className="-my-1 -mr-2">{actions(r)}</span>}
                 {c.right && (c.right.tone
@@ -180,7 +180,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
                   : <span className="whitespace-nowrap tabular-nums">{c.right.text}</span>)}
               </div>
               {(c.foot || (acts && !inlineEdit)) && (
-                <div className="mt-1.5 flex items-center justify-between gap-3 text-[11.5px] text-ink-3">
+                <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-ink-2">
                   <span className="min-w-0 truncate">{c.foot}</span>
                   {acts && actions(r)}
                 </div>

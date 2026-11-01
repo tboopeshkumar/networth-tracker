@@ -17,7 +17,7 @@
   --sunk: #f7f6f3;          /* panels inside a card */
   --ink-1: #0b0b0b;
   --ink-2: #52514e;
-  --ink-3: #82807a;
+  --ink-3: #6b6963;
   --grid: #e7e6e0;
   --axis: #c3c2b7;
   --line: rgba(11, 11, 11, 0.1);
@@ -128,7 +128,7 @@
 /* Tones the holdings views hand back as class names */
 @utility up { color: var(--good); }
 @utility down { color: var(--bad); }
-@utility strong { color: var(--ink-1); font-weight: 500; }
+@utility strong { color: var(--ink-1); font-weight: 600; }
 
 /* Home Screen launches sit under the notch and home indicator */
 @utility safe-bar {
@@ -164,16 +164,20 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .chart .bar-down { fill: var(--bad); }
 
 /* ---------- data tables (holdings, edit review) ---------- */
-.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th {
-  text-align: left; white-space: nowrap; padding: 8px 16px 8px 0; border-bottom: 1px solid var(--line);
-  font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
+/* In the components layer, so utilities on a cell (up, down, strong, text-*) win over these */
+@layer components {
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th {
+    text-align: left; white-space: nowrap; padding: 8px 16px 8px 0; border-bottom: 1px solid var(--line);
+    font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .tbl td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--grid); color: var(--ink-2); white-space: nowrap; vertical-align: middle; }
+  .tbl th:last-child, .tbl td:last-child { padding-right: 0; }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr:hover td { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
+  /* Figures are what these tables are for: full ink, with up, down and strong on top */
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-1); }
+  .tbl td.name { color: var(--ink-1); white-space: normal; min-width: 180px; font-weight: 500; }
+  .tbl td.act { text-align: right; }
 }
-.tbl td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--grid); color: var(--ink-2); white-space: nowrap; vertical-align: middle; }
-.tbl th:last-child, .tbl td:last-child { padding-right: 0; }
-.tbl tbody tr:last-child td { border-bottom: 0; }
-.tbl tbody tr:hover td { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
-.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
-.tbl td.name { color: var(--ink-1); white-space: normal; min-width: 180px; font-weight: 500; }
-.tbl td.act { text-align: right; }
 .sub2 { font-size: 11.5px; color: var(--ink-3); font-weight: 400; }
