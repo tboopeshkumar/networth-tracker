@@ -73,8 +73,11 @@ function Flow({ def, sheetTitle, onWrite, onSaved, onDone }: { def: EditorDef; s
   const [writing, setWriting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const first = useRef<HTMLInputElement & HTMLSelectElement>(null);
+  const confirm = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { if (!review) first.current?.focus(); }, [review]);
+  // Enter carries on from the form to the write. A deletion stays a deliberate click.
+  useEffect(() => { if (review && !writing && !def.danger) confirm.current?.focus(); }, [review, writing, def.danger]);
 
   const change = (f: Field, value: string) => {
     setVals((prev) => {
@@ -141,7 +144,11 @@ function Flow({ def, sheetTitle, onWrite, onSaved, onDone }: { def: EditorDef; s
         )}
         <div className={ACTIONS}>
           <button type="button" className={BTN} disabled={writing} onClick={() => setReview(null)}>Back</button>
-          <button type="button" className={def.danger ? BTN_DANGER : BTN_PRIMARY} disabled={writing} onClick={() => void write()}>
+          <button
+            type="button" ref={confirm} className={def.danger ? BTN_DANGER : BTN_PRIMARY} disabled={writing} onClick={() => void write()}
+            // Enter held down from the form must not write past the review unseen
+            onKeyDown={(e) => { if (e.key === 'Enter' && e.repeat) e.preventDefault(); }}
+          >
             {writing ? 'Writing…' : def.danger ? 'Delete from sheet' : 'Write to sheet'}
           </button>
         </div>
