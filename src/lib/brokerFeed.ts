@@ -3,7 +3,7 @@
 // and a Total row. Found by header text, so columns can be moved; the amount
 // headers carry the currency, "Value ($)" or "Value (USD)".
 
-import { isNum, type Cell } from './format';
+import { isNum, isoToSerial, type Cell } from './format';
 import type { Grid } from './model';
 
 export const ETORO_TAB = 'eToro Feed';
@@ -63,4 +63,29 @@ export function readBrokerFeed(grid: Grid | undefined): BrokerFeed | null {
     });
   }
   return { currency, rows, total, refreshed };
+}
+
+/* ---------- IBKR deposits ---------- */
+
+// "IBKR Deposits", kept by apps-script/IbkrFeed.gs when the Flex Query has a
+// Cash Transactions section: Date (yyyy-mm-dd) | Amount (base currency,
+// withdrawals negative) | Currency | Description | Transaction ID.
+export const IBKR_DEPOSITS_TAB = 'IBKR Deposits';
+
+export interface Deposit { day: number; amount: number }
+
+export function readDeposits(grid: Grid | undefined): Deposit[] {
+  if (!grid?.length) return [];
+  const head = grid.findIndex((r) => r?.some((v) => norm(v) === 'date') && r.some((v) => norm(v) === 'amount'));
+  if (head < 0) return [];
+  const date = grid[head].findIndex((v) => norm(v) === 'date');
+  const amount = grid[head].findIndex((v) => norm(v) === 'amount');
+  const out: Deposit[] = [];
+  for (const r of grid.slice(head + 1)) {
+    const d = String(r?.[date] ?? '').trim();
+    const a = r?.[amount];
+    const day = isNum(r?.[date]) ? Math.floor(r[date] as number) : /^\d{4}-\d{2}-\d{2}$/.test(d) ? isoToSerial(d) : null;
+    if (day !== null && isNum(a) && a !== 0) out.push({ day, amount: a });
+  }
+  return out.sort((x, y) => x.day - y.day);
 }

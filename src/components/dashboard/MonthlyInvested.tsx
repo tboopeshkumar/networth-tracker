@@ -24,7 +24,8 @@ export function MonthlyInvested({ model }: { model: Model }) {
   const data = useMemo(() => monthlyInvested(model), [model]);
   if (!data) return null;
   const { series, months } = data;
-  const brokers = series.filter((s) => s.key !== 'mf').map((s) => s.label);
+  const brokers = series.filter((s) => s.key !== 'mf' && s.kind === 'change').map((s) => s.label);
+  const exact = series.filter((s) => s.kind === 'deposits').map((s) => s.label);
 
   // A rough rupee total for the month, at today's rates; only when every amount converts
   const aedInr = n0(model.cells.fxAedInr?.value);
@@ -45,7 +46,7 @@ export function MonthlyInvested({ model }: { model: Model }) {
   const note = (row: MonthRow, s: Series) => isNum(row.values[s.key]) && row.from[s.key] !== undefined && row.from[s.key] > isoToSerial(`${row.month}-01`) ? `from ${fmtDay(row.from[s.key])}` : null;
 
   return (
-    <Card title="Invested each month" sub={`The rise in each one's invested total, from the daily log: ${series.map((s) => `${s.label} since ${fmtDay(s.since)}`).join(' · ')}`}>
+    <Card title="Invested each month" sub={`What went into each, by month: ${series.map((s) => `${s.label} since ${fmtDay(s.since)}`).join(' · ')}`}>
       {/* Phones: a block per month */}
       <div className="-mx-4 -mb-4 overflow-hidden rounded-b-xl border-t border-line sm:hidden">
         {months.map((row) => (
@@ -93,6 +94,7 @@ export function MonthlyInvested({ model }: { model: Model }) {
       <ul className="mt-3 space-y-0.5 text-xs text-ink-3 max-sm:mt-6">
         {series.some((s) => s.key === 'mf') && <li><b className="font-medium text-ink-2">Mutual funds:</b> counted once their Invested amount is updated, e.g. by Import CAS.</li>}
         {brokers.length > 0 && <li><b className="font-medium text-ink-2">{brokers.join(' and ')}:</b> include profit from sales left in the account.</li>}
+        {exact.length > 0 && <li><b className="font-medium text-ink-2">{exact.join(' and ')}:</b> actual deposits, minus withdrawals.</li>}
         <li><b className="font-medium text-ink-2">Total:</b> converted to ₹ at today’s rates.</li>
       </ul>
     </Card>

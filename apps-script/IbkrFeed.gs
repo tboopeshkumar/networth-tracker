@@ -19,9 +19,17 @@
  * One row per position, then cash and a Total row. Point the IBKR line's
  * current value at it, e.g.
  *   =VLOOKUP("Total", 'IBKR Feed'!A:F, 6, FALSE)
+ *
+ * If the Flex Query also has a Cash Transactions section with Deposits &
+ * Withdrawals, each one is kept in an "IBKR Deposits" tab, newest last:
+ *   A Date (text, yyyy-mm-dd)   B Amount (base currency; withdrawals negative)
+ *   C Currency   D Description   E Transaction ID
+ * New ones are added to what's there, so history older than the query's
+ * period is never lost. The web app adds them up by month.
  */
 
 const IBKR_TAB = 'IBKR Feed';
+const IBKR_DEPOSITS_TAB = 'IBKR Deposits';
 const IBKR_FLEX = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService';
 
 /* ---------- token ---------- */
@@ -134,7 +142,56 @@ function flexToPlain_(root) {
     positions,
     cash: summary ? flexNum_(summary.endingCash) : 0,
     hasCash: !!summary,
+    // null when the query has no Cash Transactions section at all
+    cashTransactions: st.getChild('CashTransactions') ? section('CashTransactions', 'CashTransaction') : null,
   };
+}
+
+/**
+ * Deposits and withdrawals among the statement's cash transactions, in the
+ * base currency. Pure, so it can be tested outside Google.
+ *   → [{ day: 'yyyy-mm-dd', amount, currency, description, id }]
+ */
+function ibkrDeposits_(cashTransactions) {
+  const out = [];
+  for (const t of cashTransactions || []) {
+    if (!/deposit|withdraw/i.test(t.type || '')) continue;
+    // A summary line repeats its detail lines
+    if (t.levelOfDetail && !/detail/i.test(t.levelOfDetail)) continue;
+    const when = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(t.settleDate || t.reportDate || t.dateTime || t.date || '');
+    const amount = flexNum_(t.amount) * (flexNum_(t.fxRateToBase) || 1);
+    if (!when || !amount) continue;
+    out.push({ day: when[1] + '-' + when[2] + '-' + when[3], amount, currency: t.currency || '', description: t.description || '', id: t.transactionID || '' });
+  }
+  return out;
+}
+
+/** Adds the statement's deposits to the IBKR Deposits tab, keeping every row already there. */
+function writeIbkrDeposits_(deposits) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(IBKR_DEPOSITS_TAB) || ss.insertSheet(IBKR_DEPOSITS_TAB);
+  const headers = ['Date', 'Amount', 'Currency', 'Description', 'Transaction ID'];
+  const last = sh.getLastRow();
+  const rows = last > 1 ? sh.getRange(2, 1, last - 1, headers.length).getValues().map((r) => r.map((v) => (typeof v === 'number' ? v : String(v)))) : [];
+  // The same transaction comes back in every statement whose period covers it
+  const key = (r) => (r[4] ? 'id:' + r[4] : [r[0], Math.round(r[1] * 100), r[3]].join('|'));
+  const seen = new Set(rows.map(key));
+  let added = 0;
+  for (const d of deposits) {
+    const row = [d.day, d.amount, d.currency, d.description, d.id];
+    if (seen.has(key(row))) continue;
+    seen.add(key(row));
+    rows.push(row);
+    added++;
+  }
+  if (!added && last > 1) return;
+  rows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  // Text, so a date is the same day whatever zone reads it
+  sh.getRange('A:A').setNumberFormat('@');
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  if (rows.length) sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  sh.getRange('B:B').setNumberFormat('#,##0.00');
 }
 
 /* ---------- refresh ---------- */
@@ -160,6 +217,15 @@ function refreshIbkr_(warn) {
   sh.getRange('D:D').setNumberFormat('#,##0.####');
   sh.getRange('E:G').setNumberFormat('#,##0.00');
   sh.getRange('H:H').setNumberFormat('d mmm yyyy h:mm');
+
+  // Deposits are a bonus: a problem with them doesn't fail the refresh
+  if (stmt.cashTransactions) {
+    try {
+      writeIbkrDeposits_(ibkrDeposits_(stmt.cashTransactions));
+    } catch (e) {
+      warn('IBKR deposits not recorded: ' + e.message + '.');
+    }
+  }
 }
 
 function installIbkrTrigger() {

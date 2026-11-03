@@ -61,3 +61,20 @@ withFixture('without a log there is no card', () => {
   delete f.values[DAILY_TAB];
   assert.equal(monthlyInvested(buildModel(f.values, f.formulas)), null);
 });
+
+withFixture('with IBKR\'s deposits in the sheet, its months are the actual deposits', () => {
+  const f = JSON.parse(readFileSync(FIX, 'utf8')) as Fixture;
+  for (const t of ['eToro Feed', 'IBKR Feed']) { delete f.values[t]; delete f.formulas[t]; }
+  const mf = buildModel(f.values, f.formulas).rows.networth.find((r) => /mutual fund/i.test(String(r.asset)))!;
+  f.values[DAILY_TAB] = [HEAD, ['2026-10-31', String(mf.asset), n0(mf.invested) - 5000, 1], ['2026-10-31', 'Invested: IBKR (USD)', 99999, '']];
+  f.values['IBKR Deposits'] = [['Date', 'Amount', 'Currency', 'Description', 'Transaction ID'], ['2026-08-14', 1000, 'USD', '', '1'], ['2026-10-03', 2000, 'USD', '', '2'], ['2026-10-20', -500, 'USD', '', '3'], ['2026-11-01', 300, 'USD', '', '4']];
+  const out = monthlyInvested(buildModel(f.values, f.formulas), isoToSerial('2026-11-03'))!;
+  const ibkr = out.series.find((s) => s.key === 'IBKR')!;
+  assert.equal(ibkr.kind, 'deposits', 'the logged invested total is not used');
+  const by = Object.fromEntries(out.months.map((r) => [r.month, r.values]));
+  assert.equal(by['2026-11'].IBKR, 300);
+  assert.equal(by['2026-10'].IBKR, 1500, 'withdrawals count against the month');
+  assert.equal(by['2026-08'].IBKR, 1000, 'history from before the log began');
+  assert.ok(!('2026-09' in by), 'a month with nothing at all is left out');
+  assert.equal(by['2026-08'].mf, null);
+});

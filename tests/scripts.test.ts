@@ -235,6 +235,36 @@ test('eToro: a holding without a live price keeps its last value; an empty state
   assert.equal(JSON.stringify(sheets['eToro Feed'].rows), before);
 });
 
+test('IBKR: deposits and withdrawals are kept in their own tab, added to what is there', () => {
+  const sheets: Record<string, Sheet> = { 'IBKR Feed': brokerTab() };
+  const s = scripts(sheets, () => ({}));
+  // As the Flex XML's attributes: dates in yyyymmdd, amounts in the transaction's currency
+  const statement = (tx: Record<string, string>[]) => ({
+    base: 'USD', cash: 50, hasCash: true, cashTransactions: tx,
+    positions: [{ symbol: 'AAA', description: 'A', assetCategory: 'STK', position: '10', positionValue: '2300', costBasisMoney: '1500', fxRateToBase: '1', levelOfDetail: 'SUMMARY' }],
+  });
+  s.fetchFlexStatement_ = () => ({});
+  s.flexToPlain_ = () => statement([
+    { type: 'Deposits/Withdrawals', settleDate: '20261003', amount: '2000', currency: 'USD', fxRateToBase: '1', description: 'CASH RECEIPTS', transactionID: '11', levelOfDetail: 'DETAIL' },
+    { type: 'Deposits/Withdrawals', settleDate: '20261020', amount: '-500', currency: 'USD', fxRateToBase: '1', description: 'DISBURSEMENT', transactionID: '12', levelOfDetail: 'DETAIL' },
+    { type: 'Deposits/Withdrawals', reportDate: '20261020', amount: '1500', currency: 'USD', levelOfDetail: 'SUMMARY' },
+    { type: 'Dividends', settleDate: '20261010', amount: '12', currency: 'USD', transactionID: '13' },
+    { type: 'Deposits/Withdrawals', settleDate: '20261101', amount: '1000', currency: 'AED', fxRateToBase: '0.2723', description: 'CASH RECEIPTS', transactionID: '14' },
+  ]);
+  runInNewContext('refreshIbkr()', s);
+  const tab = () => sheets['IBKR Deposits'].rows.slice(1).filter((r) => r[0] !== '').map((r) => [r[0], Math.round(Number(r[1]) * 100) / 100, r[4]]);
+  assert.deepEqual(tab(), [['2026-10-03', 2000, '11'], ['2026-10-20', -500, '12'], ['2026-11-01', 272.3, '14']], 'deposits only, in the base currency');
+
+  // A later statement no longer reaching back to October: those rows stay, the new one is added, none twice
+  s.flexToPlain_ = () => statement([
+    { type: 'Deposits/Withdrawals', settleDate: '20261101', amount: '1000', currency: 'AED', fxRateToBase: '0.2723', transactionID: '14' },
+    { type: 'Deposits/Withdrawals', settleDate: '20261105', amount: '300', currency: 'USD', fxRateToBase: '1', transactionID: '15' },
+  ]);
+  runInNewContext('refreshIbkr()', s);
+  assert.deepEqual(tab().map((r) => r[2]), ['11', '12', '14', '15']);
+  assert.equal(status(sheets, 'IBKR')?.[1], 'OK');
+});
+
 test('IBKR: an empty statement is refused and the tab kept', () => {
   const sheets = { 'IBKR Feed': brokerTab() };
   const s = scripts(sheets, () => ({}));

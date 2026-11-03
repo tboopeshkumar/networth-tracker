@@ -8,7 +8,7 @@
 import { a1, colIndex, isNum, n0, type Cell } from './format';
 import { JEWELLERY_TAB, readJewellery, type Jewellery } from './jewellery';
 import { RATES_TAB, readRatesFeed, type FeedRate } from './ratesFeed';
-import { ETORO_TAB, IBKR_TAB, readBrokerFeed, type BrokerFeed } from './brokerFeed';
+import { ETORO_TAB, IBKR_DEPOSITS_TAB, IBKR_TAB, readBrokerFeed, readDeposits, type BrokerFeed, type Deposit } from './brokerFeed';
 import { DAILY_TAB, readDailyLog, type DaySnapshot } from './dailyLog';
 import { STATUS_TAB, readFeedStatus, type FeedRun } from './feedStatus';
 import { HISTORY_TAB, readRateHistory, type RatePoint } from './rateHistory';
@@ -146,10 +146,10 @@ export const SPECS = {
  * formulas aren't needed, so only their values are downloaded. Daily Log and
  * Rates History grow by the day, which is where this counts.
  */
-export const VALUES_ONLY_TABS: readonly string[] = [RATES_TAB, ETORO_TAB, IBKR_TAB, DAILY_TAB, STATUS_TAB, HISTORY_TAB];
+export const VALUES_ONLY_TABS: readonly string[] = [RATES_TAB, ETORO_TAB, IBKR_TAB, IBKR_DEPOSITS_TAB, DAILY_TAB, STATUS_TAB, HISTORY_TAB];
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB, IBKR_DEPOSITS_TAB] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -249,6 +249,8 @@ export interface Model {
   feeds: FeedRun[];
   /** Each rate's past days (label → points), if the sheet keeps a Rates History tab. */
   rateHistory: Record<string, RatePoint[]>;
+  /** IBKR deposits and withdrawals, oldest first, if the sheet keeps an IBKR Deposits tab. */
+  ibkrDeposits: Deposit[];
 }
 
 /** A family-loan ledger's entries, addressed like a table: "ledger:" + its tab's name. */
@@ -490,7 +492,7 @@ export function buildModel(values: Grids, formulas: Grids): Model {
     c.formula = isFormula(f) ? f : null;
   }
 
-  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]), daily: readDailyLog(values[DAILY_TAB]), feeds: readFeedStatus(values[STATUS_TAB]), rateHistory: readRateHistory(values[HISTORY_TAB]) };
+  return { tables: t, rows: R, totals, cells, summaries, ledgers, jewellery: readJewellery(values[JEWELLERY_TAB], formulas[JEWELLERY_TAB]), ratesFeed: readRatesFeed(values[RATES_TAB]), etoro: readBrokerFeed(values[ETORO_TAB]), ibkr: readBrokerFeed(values[IBKR_TAB]), daily: readDailyLog(values[DAILY_TAB]), feeds: readFeedStatus(values[STATUS_TAB]), rateHistory: readRateHistory(values[HISTORY_TAB]), ibkrDeposits: readDeposits(values[IBKR_DEPOSITS_TAB]) };
 }
 
 /**
