@@ -90,8 +90,7 @@ export function MonthlyInvested({ model }: { model: Model }) {
       </div>
 
       <p className="mt-3 text-xs text-ink-3 max-sm:mt-6">
-        Mutual funds move when the Invested column on the Mutual Funds tab is updated, for example by Import CAS with
-        “Also update invested amounts”. eToro and IBKR also move with profit from a sale left in the account. Totals use today’s rates.
+        Funds count once their Invested amount is updated. Brokers include profit left in the account. ₹ totals at today’s rates.
       </p>
     </Card>
   );
