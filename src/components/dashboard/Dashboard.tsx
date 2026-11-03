@@ -8,6 +8,7 @@ import { BTN, Card, type OnEdit } from '../ui';
 import { Allocation } from './Allocation';
 import { Checks } from './Checks';
 import { Holdings } from './Holdings';
+import { MonthlyInvested } from './MonthlyInvested';
 import { Movers, MoversOverTime } from './Movers';
 import { Positions } from './Positions';
 import { PriceMovements } from './PriceMovements';
@@ -85,6 +86,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
       <Card title="Month-on-month change" sub="Recorded saving or drawdown between entries">
         <ChangeChart series={trend} />
       </Card>
+      {/* What went into funds and brokers each month, from the daily log */}
+      <MonthlyInvested model={model} />
       <Allocation model={model} />
       {/* The longer view of the same log, last: looked at now and then, not daily */}
       <MoversOverTime model={model} linkOf={linkOf} onDrill={drill} />

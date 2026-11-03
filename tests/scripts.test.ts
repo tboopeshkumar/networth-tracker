@@ -195,6 +195,16 @@ test('Rates History: the first run fills in the month, later runs add days witho
   assert.equal(status(sheets, 'Gold & AED rates')?.[1], 'Warning', 'the missing history is reported');
 });
 
+test('Daily log: each broker feed\'s total invested is logged beside the Net Worth lines', () => {
+  const sheets: Record<string, Sheet> = {
+    'Net Worth': new Sheet([['Asset', 'Holder', 'Invested (INR)', 'Current Value (INR)'], ['Mutual Funds', 'X', 100, 120], ['GRAND TOTAL', '', 100, 120]]),
+    'eToro Feed': new Sheet([['Symbol', 'Name', 'Type', 'Units', 'Invested ($)', 'Value ($)', 'P&L ($)', 'Refreshed'], ['AAA', '', '', 1, 900, 1000, 100, 'x'], ['Total', '', '', '', 2550, 4450, 1900, 'x']]),
+  };
+  scripts(sheets, () => ({})).logDaily();
+  const rows = sheets['Daily Log'].rows.slice(1).map((r) => [r[1], r[2]]);
+  assert.deepEqual(rows, [['Mutual Funds', 100], ['Invested: eToro (USD)', 2550]], 'no IBKR tab, no IBKR line');
+});
+
 /* ---------- brokers ---------- */
 
 const brokerTab = () => new Sheet([

@@ -1,6 +1,7 @@
 // The "Daily Log" tab, filled each night by apps-script/DailyLog.gs: one row
 // per Net Worth line per day (Date, Line, Invested, Current), plus the day's
-// AED → INR rate as a line named "Rate: AED → INR". Comparing what the sheet
+// AED → INR rate as a line named "Rate: AED → INR", and each broker's total
+// invested as "Invested: eToro (USD)". Comparing what the sheet
 // says now with the last day before today shows what moved, and why a total did.
 
 import { isNum, isoToSerial, n0, todaySerial, type Cell } from './format';
@@ -8,12 +9,15 @@ import type { Grid, Model, NetWorthRow } from './model';
 
 export const DAILY_TAB = 'Daily Log';
 const RATE = /^rate:\s*/i;
+const BROKER = /^invested:\s*(.+?)\s*(?:\(([^)]+)\))?$/i;
 
 export interface DaySnapshot {
   /** date serial */
   day: number;
   lines: Record<string, { invested: number | null; current: number | null }>;
   rates: Record<string, number>;
+  /** each broker feed's total invested that day, in its own currency */
+  brokers: Record<string, { amount: number; currency: string }>;
 }
 
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
@@ -36,12 +40,15 @@ export function readDailyLog(grid: Grid | undefined): DaySnapshot[] {
     const name = String(r?.[line] ?? '').trim();
     if (day === null || !name) continue;
     let snap = days.get(day);
-    if (!snap) days.set(day, snap = { day, lines: {}, rates: {} });
+    if (!snap) days.set(day, snap = { day, lines: {}, rates: {}, brokers: {} });
     const cur = r[current];
+    const inv = invested >= 0 ? r[invested] : undefined;
+    const broker = BROKER.exec(name);
     if (RATE.test(name)) {
       if (isNum(cur)) snap.rates[name.replace(RATE, '')] = cur;
+    } else if (broker) {
+      if (isNum(inv)) snap.brokers[broker[1]] = { amount: inv, currency: (broker[2] ?? 'USD').toUpperCase() };
     } else {
-      const inv = invested >= 0 ? r[invested] : undefined;
       snap.lines[name] = { invested: isNum(inv) ? inv : null, current: isNum(cur) ? cur : null };
     }
   }

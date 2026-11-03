@@ -317,6 +317,8 @@ Invested capital and net worth move by themselves from one day to the next: AED 
 1. In **Extensions → Apps Script**, add a script file, paste `DailyLog.gs`, and paste the updated `NavFeed.gs` (menu items). Save and reload the sheet.
 2. **Net Worth → Record daily log now**, then **Record daily log every night (11pm UAE)**.
 
+The log also keeps the eToro and IBKR feeds' total invested each night, and the app turns the rise in those totals, and in the Mutual Funds line's invested, into **Invested each month**. That's the change in each one's invested figure, not a list of transfers: profit from a sale left in a broker account counts too, and funds only move when their Invested column is updated.
+
 The section appears from the day after the first record. The same comparison against a week, a month and a year ago sits at the end of the dashboard under **Changes over time**; each opens once the log reaches back that far. *Worth a look* flags the log if it stops recording. Rows older than 400 days are removed.
 
 ### Daily mutual fund NAVs

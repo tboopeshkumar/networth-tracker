@@ -11,7 +11,9 @@
  * One row per line per day:
  *   A Date (text, yyyy-mm-dd)   B Line   C Invested (INR)   D Current (INR)
  * The AED → INR rate is logged too, as a line named "Rate: AED → INR" with
- * the rate under Current. Running it twice in a day replaces that day's rows,
+ * the rate under Current, and each broker feed's total invested, as lines
+ * such as "Invested: eToro (USD)" with the amount under Invested; the web app
+ * turns the day-to-day changes into what went in each month. Running it twice in a day replaces that day's rows,
  * and rows older than 400 days are removed.
  */
 
@@ -49,6 +51,10 @@ function logDaily_() {
   if (!rows.length) throw new Error('Daily log: the Net Worth tab has no lines');
   const rate = dailyAedInr_();
   if (rate) rows.push([day, DAILY_RATE, '', rate]);
+  for (const [broker, tab] of [['eToro', 'eToro Feed'], ['IBKR', 'IBKR Feed']]) {
+    const inv = dailyBrokerInvested_(tab);
+    if (inv) rows.push([day, 'Invested: ' + broker + ' (' + inv.currency + ')', inv.amount, '']);
+  }
 
   // Rows are in date order: today's (a rerun) are at the end, the oldest at the top
   const dates = sh.getLastRow() > 1
@@ -98,6 +104,24 @@ function dailyAedInr_() {
     if (c >= 0 && typeof r[c + 1] === 'number' && r[c + 1] > 0) return r[c + 1];
   }
   return null;
+}
+
+/**
+ * A broker feed tab's total invested and its currency: the Total row, under
+ * the header that starts "Invested" ("Invested ($)", "Invested (USD)").
+ * Null when the tab or its total isn't there.
+ */
+function dailyBrokerInvested_(tab) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(tab);
+  if (!sh) return null;
+  const g = sh.getDataRange().getValues();
+  const head = g.findIndex((r) => r.some((v) => /^symbol$/i.test(String(v).trim())));
+  if (head < 0) return null;
+  const col = g[head].findIndex((v) => /^invested\b/i.test(String(v).trim()));
+  const total = g.slice(head + 1).find((r) => /^total$/i.test(String(r[0]).trim()));
+  if (col < 0 || !total || typeof total[col] !== 'number') return null;
+  const code = (/\(([^)]+)\)/.exec(String(g[head][col])) || [])[1] || 'USD';
+  return { amount: total[col], currency: code === '$' ? 'USD' : code.toUpperCase() };
 }
 
 /* ---------- schedule ---------- */
