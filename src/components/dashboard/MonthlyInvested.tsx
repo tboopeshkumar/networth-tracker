@@ -24,6 +24,7 @@ export function MonthlyInvested({ model }: { model: Model }) {
   const data = useMemo(() => monthlyInvested(model), [model]);
   if (!data) return null;
   const { series, months } = data;
+  const brokers = series.filter((s) => s.key !== 'mf').map((s) => s.label);
 
   // A rough rupee total for the month, at today's rates; only when every amount converts
   const aedInr = n0(model.cells.fxAedInr?.value);
@@ -89,9 +90,11 @@ export function MonthlyInvested({ model }: { model: Model }) {
         </table>
       </div>
 
-      <p className="mt-3 text-xs text-ink-3 max-sm:mt-6">
-        Funds count once their Invested amount is updated. Brokers include profit left in the account. ₹ totals at today’s rates.
-      </p>
+      <ul className="mt-3 space-y-0.5 text-xs text-ink-3 max-sm:mt-6">
+        {series.some((s) => s.key === 'mf') && <li><b className="font-medium text-ink-2">Mutual funds:</b> counted once their Invested amount is updated, e.g. by Import CAS.</li>}
+        {brokers.length > 0 && <li><b className="font-medium text-ink-2">{brokers.join(' and ')}:</b> include profit from sales left in the account.</li>}
+        <li><b className="font-medium text-ink-2">Total:</b> converted to ₹ at today’s rates.</li>
+      </ul>
     </Card>
   );
 }
