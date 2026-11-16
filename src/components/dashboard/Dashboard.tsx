@@ -9,6 +9,7 @@ import { Allocation } from './Allocation';
 import { Checks } from './Checks';
 import { Holdings } from './Holdings';
 import { MonthlyInvested } from './MonthlyInvested';
+import { SavingVsIncome } from './SavingVsIncome';
 import { Movers, MoversOverTime } from './Movers';
 import { Positions } from './Positions';
 import { PriceMovements } from './PriceMovements';
@@ -86,6 +87,8 @@ export function Dashboard({ loaded: { model, data }, canEdit, onEdit }: Props) {
       <Card title="Month-on-month change" sub="Recorded saving or drawdown between entries">
         <ChangeChart series={trend} />
       </Card>
+      {/* How much of each month's income was saved */}
+      <SavingVsIncome model={model} />
       {/* What went into funds and brokers each month, from the daily log */}
       <MonthlyInvested model={model} />
       <Allocation model={model} />
