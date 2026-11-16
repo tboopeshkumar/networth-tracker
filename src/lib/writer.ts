@@ -86,6 +86,21 @@ export interface RemoveOp {
   expectKeys: string[];
 }
 
+/**
+ * Put a table's rows in a new order. Each row is cut and pasted, never
+ * rewritten: its cells, formatting and anything referring to them go with it.
+ * Rows aren't inserted or deleted, so ranges such as a total's SUM keep their
+ * bounds, and a table beside it is untouched.
+ */
+export interface ReorderOp {
+  type: 'reorderRows';
+  id: TableId;
+  /** row keys in the new order */
+  keys: string[];
+  /** row keys as the user saw them */
+  expectKeys: string[];
+}
+
 export interface Change {
   where: string;
   a1: string;
@@ -96,7 +111,7 @@ export interface Change {
 export interface Plan {
   title: string;
   changes: Change[];
-  ops: (SetOp | InsertOp | RemoveOp)[];
+  ops: (SetOp | InsertOp | RemoveOp | ReorderOp)[];
 }
 
 const shown = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : isNum(v) ? v.toLocaleString('en-IN') : String(v));
@@ -211,9 +226,44 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   if (remove && plan.ops.length > 1) throw new Error('A removal must be the only change in its plan');
   const removeAt = remove ? locateRemoval(model, remove, problems) : null;
 
+  const reorder = plan.ops.find((o): o is ReorderOp => o.type === 'reorderRows');
+  if (reorder && plan.ops.length > 1) throw new Error('A reorder must be the only change in its plan');
+  const reorderAt = reorder ? locateReorder(model, reorder, problems) : null;
+
   if (problems.length) throw new ConflictError('The sheet changed since you loaded it. Nothing was written.', problems);
 
   const requests: BatchRequest[] = [];
+  if (reorder && reorderAt) {
+    const sid = sheetId(reorderAt.tab);
+    const width = reorderAt.maxCol - reorderAt.minCol + 1;
+    // A spare block, in columns added past the tab's last and removed again at the end
+    const spareCol = meta.find((m) => m.title === reorderAt.tab)?.columnCount;
+    if (spareCol === undefined) throw new Error('Couldn’t read the tab’s size; nothing was written.');
+    const rowRange = (row: number) => ({ sheetId: sid, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: reorderAt.minCol, endColumnIndex: reorderAt.maxCol + 1 });
+    const spare = { sheetId: sid, startRowIndex: reorderAt.slots[0], endRowIndex: reorderAt.slots[0] + 1, startColumnIndex: spareCol, endColumnIndex: spareCol + width };
+    const cut = (source: typeof spare, row: number, col = reorderAt.minCol): BatchRequest =>
+      ({ cutPaste: { source, destination: { sheetId: sid, rowIndex: row, columnIndex: col }, pasteType: 'PASTE_NORMAL' } });
+
+    requests.push({ appendDimension: { sheetId: sid, dimension: 'COLUMNS', length: width } });
+    // Each cycle of the move: park one row in the spare block, pull each row into the gap the last one left, then the parked row
+    const from = reorderAt.from;
+    const placed = new Set<number>();
+    for (const start of reorderAt.slots) {
+      if (placed.has(start) || from.get(start) === start) { placed.add(start); continue; }
+      requests.push(cut(rowRange(start), spare.startRowIndex, spareCol));
+      placed.add(start);
+      for (let gap = start; ;) {
+        const src = from.get(gap)!;
+        if (src === start) { requests.push(cut(spare, gap)); break; }
+        requests.push(cut(rowRange(src), gap));
+        placed.add(src);
+        gap = src;
+      }
+    }
+    requests.push({ deleteDimension: { range: { sheetId: sid, dimension: 'COLUMNS', startIndex: spareCol, endIndex: spareCol + width } } });
+    await backend.batchUpdate(requests);
+    return { requests };
+  }
   if (remove && removeAt) {
     const sid = sheetId(removeAt.tab);
     if (removeAt.sideBySide) {
@@ -281,6 +331,21 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
   return { requests };
 }
 
+/** Where each row of a reorder comes from, or why it can't happen: the rows must be as the user saw them. */
+function locateReorder(model: Model, op: ReorderOp, problems: string[]) {
+  const tbl = tableOf(model, op.id);
+  const rows = rowsOf(model, op.id);
+  if (!tbl || rows.map((r) => r._key).join('\n') !== op.expectKeys.join('\n')) {
+    problems.push(`${tbl?.spec.tab ?? 'That table'}: rows were added, removed or changed since you loaded it`);
+    return null;
+  }
+  const at = new Map(rows.map((r) => [r._key, r._row]));
+  // The rows keep the sheet rows they occupy now (blank rows between them stay put); only their contents swap
+  const slots = rows.map((r) => r._row);
+  const from = new Map(slots.map((slot, i) => [slot, at.get(op.keys[i])!]));
+  return { tab: tbl.spec.tab, minCol: tbl.minCol, maxCol: tbl.maxCol, slots, from };
+}
+
 /** Where a removal lands now, or why it can't: the rows from it to the table's end must be as the user saw them. */
 function locateRemoval(model: Model, op: RemoveOp, problems: string[]) {
   const tbl = tableOf(model, op.id);
@@ -296,6 +361,21 @@ function locateRemoval(model: Model, op: RemoveOp, problems: string[]) {
 }
 
 /* ---------- plan builders ---------- */
+
+/** Reorder a table's rows; the review lists each position whose row changes. */
+export function planReorder(model: Model, id: TableId, keys: string[], title: string, name: (r: Row) => string): Plan {
+  const tbl = tableOf(model, id)!;
+  const rows = rowsOf(model, id);
+  const byKey = new Map(rows.map((r) => [r._key, r]));
+  if (keys.length !== rows.length || new Set(keys).size !== keys.length || keys.some((k) => !byKey.has(k))) {
+    throw new Error('That table changed since you loaded it. Refresh and try again.');
+  }
+  const changes = rows.flatMap((r, i) => (r._key === keys[i] ? [] : [{
+    where: `Position ${i + 1}`, a1: a1(tbl.spec.tab, r._row, tbl.minCol), before: name(r), after: name(byKey.get(keys[i])!),
+  }]));
+  if (!changes.length) throw new Error('Nothing changed.');
+  return { title, changes, ops: [{ type: 'reorderRows', id, keys: [...keys], expectKeys: rows.map((r) => r._key) }] };
+}
 
 /** Remove a table row; the review lists each of its cells as removed. */
 export function planRemove(model: Model, id: TableId, rec: Row, title: string): Plan {

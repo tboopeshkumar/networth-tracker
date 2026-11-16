@@ -8,7 +8,7 @@ import {
 } from './model';
 import type { SheetData } from './sheets';
 import {
-  V, planCellEdit, planInsert, planMetalPurchase, planRemove, planRowEdit,
+  V, planCellEdit, planInsert, planMetalPurchase, planRemove, planReorder, planRowEdit,
   type CellRefLike, type CellValue, type Change, type Edit, type ExecContext, type Plan, type SetOp,
 } from './writer';
 
@@ -45,7 +45,11 @@ export type EditRequest =
   | { kind: 'cell'; path: CellPath }
   | { kind: 'add'; id: AddableId | LedgerId }
   | { kind: 'link'; sheet: string }
-  | { kind: 'remove'; id: RemovableRow | LedgerId; key: string };
+  | { kind: 'remove'; id: RemovableRow | LedgerId; key: string }
+  | { kind: 'reorder'; id: ReorderableId; keys: string[] };
+
+/** Tables whose rows can be put in a chosen order, which is kept in the sheet itself. */
+export type ReorderableId = 'bankInr' | 'bankAed';
 
 /** Rows the app offers to delete: plain lists with nothing hanging off them. */
 export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
@@ -537,6 +541,23 @@ function removeEditor(model: Model, id: RemovableRow | LedgerId, rec: Row | unde
   };
 }
 
+/* ---------- reordering rows ---------- */
+
+function reorderEditor(model: Model, id: ReorderableId, keys: string[]): EditorDef {
+  const tbl = tableOf(model, id);
+  if (!tbl) throw new Error('That table is no longer in the sheet. Refresh and try again.');
+  const title = id === 'bankAed' ? 'Reorder Bank · AED' : 'Reorder Bank · INR';
+  const name = (r: Row) => (r.holder ? `${String(r.account)} (${String(r.holder)})` : String(r.account));
+  return {
+    title,
+    hint: `Moves the rows of this table on ${tbl.spec.tab} into the order you chose. Each row keeps its own cells, and anything referring to them follows; the table beside it and the total stay as they are.`,
+    fields: [],
+    build() {
+      return { plan: planReorder(model, id, keys, title, name), warn: [] };
+    },
+  };
+}
+
 /* ---------- linking a family loan to its ledger ---------- */
 
 function linkEditor(model: Model, sheet: string): EditorDef {
@@ -565,6 +586,7 @@ export function editorFor(model: Model, data: SheetData, req: EditRequest): Edit
     case 'cell': return cellEditor(model, req.path);
     case 'add': return addEditor(model, data, req.id);
     case 'link': return linkEditor(model, req.sheet);
+    case 'reorder': return reorderEditor(model, req.id, req.keys);
     case 'remove': return removeEditor(model, req.id, rowsOf(model, req.id).find((r) => r._key === req.key));
   }
 }

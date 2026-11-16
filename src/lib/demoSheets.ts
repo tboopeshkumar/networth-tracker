@@ -59,7 +59,10 @@ export class DemoSheets implements SheetsBackend {
     return new DemoSheets(await res.json() as Fixture);
   }
 
-  async meta() { return clone(this.f.sheets); }
+  async meta() {
+    // Like a real tab: at least 26 columns, more if the data runs wider
+    return this.f.sheets.map((s) => ({ ...s, columnCount: Math.max(26, ...(this.f.formulas[s.title] ?? []).map((r) => r.length)) }));
+  }
 
   async read(tabs: readonly string[], valuesOnly: readonly string[] = []): Promise<SheetData> {
     // Like Google, a read naming a tab the sheet doesn't have fails as a whole
@@ -112,9 +115,31 @@ export class DemoSheets implements SheetsBackend {
       return;
     }
     if ('deleteDimension' in req) {
-      const { sheetId, startIndex: at, endIndex: to } = req.deleteDimension.range;
+      const { sheetId, dimension, startIndex: at, endIndex: to } = req.deleteDimension.range;
       const t = this.tabOf(sheetId);
-      for (const g of [this.f.values[t], this.f.formulas[t]]) g.splice(at, to - at);
+      for (const g of [this.f.values[t], this.f.formulas[t]]) {
+        if (dimension === 'ROWS') g.splice(at, to - at);
+        else g.forEach((row) => row.splice(at, to - at));
+      }
+      return;
+    }
+    // Grids here are ragged arrays: an appended column exists as soon as it's written
+    if ('appendDimension' in req) return;
+    if ('cutPaste' in req) {
+      // Unlike Sheets, references elsewhere aren't re-pointed; the demo only needs the cells to move
+      const { source: s, destination: d } = req.cutPaste;
+      const t = this.tabOf(s.sheetId);
+      for (const g of [this.f.values[t], this.f.formulas[t]]) {
+        const block = Array.from({ length: s.endRowIndex - s.startRowIndex }, (_, i) =>
+          Array.from({ length: s.endColumnIndex - s.startColumnIndex }, (_, j) => g[s.startRowIndex + i]?.[s.startColumnIndex + j] ?? ''));
+        block.forEach((row, i) => row.forEach((_, j) => { const r = g[s.startRowIndex + i]; if (r && r.length > s.startColumnIndex + j) r[s.startColumnIndex + j] = ''; }));
+        block.forEach((row, i) => row.forEach((v, j) => {
+          while (g.length <= d.rowIndex + i) g.push([]);
+          const r = g[d.rowIndex + i];
+          while (r.length <= d.columnIndex + j) r.push('');
+          r[d.columnIndex + j] = v;
+        }));
+      }
       return;
     }
     if ('insertDimension' in req) {

@@ -435,6 +435,46 @@ withFixture('ledger entries can be added and deleted, and a delete takes its who
   }
 });
 
+withFixture('reordering bank accounts moves whole rows within their table, and nothing else', async () => {
+  const demo = new DemoSheets(fixture());
+  const { model, data, meta } = await loadAll(demo);
+  const tbl = model.tables.bankAed;
+  const tab = tbl.spec.tab;
+  const rows = model.rows.bankAed;
+  const width = Math.max(...demo.f.formulas[tab].map((r) => r.length));
+  const columnsBefore = (await demo.meta()).find((m) => m.title === tab)!.columnCount;
+  const besideBefore = JSON.stringify(demo.f.formulas[tab].map((r) => r.slice(0, tbl.minCol)));
+  const belowBefore = JSON.stringify(demo.f.formulas[tab].slice(tbl.lastRow + 1));
+  const cells = (r: { _row: number }) => demo.f.formulas[tab][r._row].slice(tbl.minCol, tbl.maxCol + 1);
+  const contentOf = new Map(rows.map((r) => [r._key, JSON.stringify(cells(r))]));
+
+  // The last account to the top, the first two swapped: a mix of cycles
+  const keys = rows.map((r) => r._key);
+  const wanted = [keys.at(-1)!, keys[1], keys[0], ...keys.slice(2, -1)];
+  const edit = editorFor(model, data, { kind: 'reorder', id: 'bankAed', keys: wanted });
+  assert.equal(edit.fields.length, 0);
+  const { plan } = edit.build({});
+  const listed = plan.changes.map((c) => c.where);
+  assert.equal(listed[0], 'Position 1');
+  assert.ok(!listed.includes('Position 2'), 'a position whose account stays is not listed');
+  const { requests } = await execute(demo, plan);
+  assert.ok(requests.every((r) => 'cutPaste' in r || 'appendDimension' in r || 'deleteDimension' in r), 'only cut and paste, plus the spare columns');
+  assert.ok(meta.length > 0);
+
+  const after = (await loadAll(demo)).model;
+  assert.deepEqual(after.rows.bankAed.map((r) => r._key), wanted, 'the new order');
+  for (const r of after.rows.bankAed) assert.equal(JSON.stringify(cells(r)), contentOf.get(r._key), `${r._key} kept its own cells`);
+  assert.deepEqual(after.rows.bankAed.map((r) => r._row), rows.map((r) => r._row), 'the same sheet rows');
+  assert.equal(JSON.stringify(demo.f.formulas[tab].map((r) => r.slice(0, tbl.minCol))), besideBefore, 'the INR table beside it is untouched');
+  assert.equal(JSON.stringify(demo.f.formulas[tab].slice(tbl.lastRow + 1)), belowBefore, 'its total and everything below are untouched');
+  assert.ok(Math.max(...demo.f.formulas[tab].map((r) => r.length)) <= Math.max(width, columnsBefore ?? 0), 'no spare columns left behind');
+
+  // Nothing to do, and a sheet that changed in between
+  assert.throws(() => editorFor(after, data, { kind: 'reorder', id: 'bankAed', keys: wanted }).build({}), /Nothing changed/);
+  const stale = editorFor(model, data, { kind: 'reorder', id: 'bankAed', keys: [...keys].reverse() }).build({}).plan;
+  await assert.rejects(execute(demo, stale), ConflictError);
+});
+
 withFixture('deleting a bank account moves only its own table, and nothing below it', async () => {
   const demo = new DemoSheets(fixture());
   const { model, data } = await loadAll(demo);

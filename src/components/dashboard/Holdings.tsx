@@ -1,9 +1,9 @@
-import { IconCheck, IconChevronRight, IconPlus } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { IconArrowBarToUp, IconArrowDown, IconArrowUp, IconArrowsSort, IconCheck, IconChevronRight, IconPlus } from '@tabler/icons-react';
+import { useEffect, useMemo, useState } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
-import { Amount, Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
+import { Amount, BTN, BTN_GHOST, BTN_PRIMARY, Card, DeleteButton, EditButton, GROUP_SLOT, PANEL, Pill, cx, slotColor, tint, type OnEdit } from '../ui';
 import { GoldValuation } from './GoldValuation';
 import { GROUP_ORDER, JEWELLERY_GROUP, buildViews, groupInr, groupNote, holdersIn, rowsFor, type View } from './holdingViews';
 
@@ -116,6 +116,53 @@ function GroupBand({ label, note, total }: { label: string; note: string | null;
   );
 }
 
+/** Choosing the order of a section's rows: up, down or to the top, then review before it's written. */
+function Arrange({ view: v, order, setOrder, onReview }: { view: View; order: string[]; setOrder: (o: string[] | null) => void; onReview: () => void }) {
+  const byKey = new Map(v.recs.map((r) => [r._key, r]));
+  const moved = order.join('\n') !== v.recs.map((r) => r._key).join('\n');
+  const move = (from: number, to: number) => {
+    const next = [...order];
+    const [key] = next.splice(from, 1);
+    next.splice(to, 0, key);
+    setOrder(next);
+  };
+  const icon = 'grid size-8 flex-none cursor-pointer place-items-center rounded-md text-ink-2 hover:bg-sunk hover:text-ink disabled:cursor-default disabled:opacity-30';
+  return (
+    <div className="pb-1 pt-1">
+      <p className="mb-2 text-xs text-ink-2">Put the accounts in the order you want, then review. The rows move in your sheet, so every device shows this order.</p>
+      <ol className={cx(PANEL, 'divide-y divide-line overflow-hidden bg-surface')}>
+        {order.map((key, i) => {
+          const c = v.card(byKey.get(key)!);
+          const label = String(byKey.get(key)!.account ?? '');
+          return (
+            <li key={key} className="flex items-center gap-2 py-1 pl-3 pr-1 text-[13px]">
+              <span className="w-5 flex-none text-xs text-ink-3 tabular-nums">{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{c.title}</span>
+                <span className="block truncate text-xs text-ink-2">{c.sub}</span>
+              </span>
+              <span className="hidden whitespace-nowrap tabular-nums text-ink-2 sm:inline">{c.value}</span>
+              <button type="button" className={icon} disabled={i === 0} onClick={() => move(i, 0)} aria-label={`Move ${label} to the top`} title="Move to the top">
+                <IconArrowBarToUp size={16} stroke={1.75} aria-hidden="true" />
+              </button>
+              <button type="button" className={icon} disabled={i === 0} onClick={() => move(i, i - 1)} aria-label={`Move ${label} up`} title="Move up">
+                <IconArrowUp size={16} stroke={1.75} aria-hidden="true" />
+              </button>
+              <button type="button" className={icon} disabled={i === order.length - 1} onClick={() => move(i, i + 1)} aria-label={`Move ${label} down`} title="Move down">
+                <IconArrowDown size={16} stroke={1.75} aria-hidden="true" />
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-2.5 flex justify-end gap-2">
+        <button type="button" className={BTN} onClick={() => setOrder(null)}>Cancel</button>
+        <button type="button" className={BTN_PRIMARY} disabled={!moved} onClick={onReview}>Review order</button>
+      </div>
+    </div>
+  );
+}
+
 function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; onEdit: OnEdit }) {
   const edit = canEdit ? v.edit : undefined;
   const remove = canEdit ? v.remove : undefined;
@@ -128,6 +175,20 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
   // A holder whose last row was just deleted is no longer a choice
   const picked = who !== null && names.includes(who) ? who : null;
   const recs = rowsFor(v, picked);
+
+  // Arranging: the rows in the order being chosen, until it's written (the rows then come back in it) or cancelled
+  const [order, setOrder] = useState<string[] | null>(null);
+  const sheetOrder = v.recs.map((r) => r._key).join('\n');
+  useEffect(() => setOrder(null), [sheetOrder]);
+  const canArrange = canEdit && !!v.reorder && v.recs.length > 1;
+  const arrange = canArrange && (
+    <button type="button" className={cx(BTN_GHOST, 'ml-auto')} onClick={() => setOrder(v.recs.map((r) => r._key))}>
+      <IconArrowsSort size={14} stroke={1.75} aria-hidden="true" /><span>Arrange</span>
+    </button>
+  );
+  if (order && v.reorder) {
+    return <Arrange view={v} order={order} setOrder={setOrder} onReview={() => onEdit({ kind: 'reorder', id: v.reorder!, keys: order })} />;
+  }
 
   const actions = (r: Row) => (
     <span className="inline-flex items-center">
@@ -155,8 +216,10 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
               {recs.length} of {v.recs.length} · <b className="font-semibold text-ink">{v.holders.total(recs)}</b>
             </span>
           )}
+          {!picked && arrange}
         </div>
       )}
+      {canArrange && !(names.length > 1 && v.holders) && <div className="mb-1 flex pt-1">{arrange}</div>}
 
       {/* phones: one card per record */}
       <div className="md:hidden">

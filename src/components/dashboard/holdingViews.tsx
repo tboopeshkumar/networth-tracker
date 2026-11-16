@@ -2,7 +2,7 @@
 // presentations: `columns` for the wide table, `card` for phones.
 
 import type { ReactNode } from 'react';
-import type { EditRequest, EditableRow } from '../../lib/editors';
+import type { EditRequest, EditableRow, ReorderableId } from '../../lib/editors';
 import {
   fmtDate, fmtDay, inr, isNum, join, n0, num, pct, ret, signedAmt, signedCr, signedInr, signedPct, todaySerial, tone, usd, type Cell,
 } from '../../lib/format';
@@ -53,6 +53,8 @@ export interface View<R extends Row = Row> {
   lead?: ReactNode;
   /** rows can be narrowed to one holder: whose a row is, and what a narrowed list adds up to */
   holders?: { of: (r: R) => string; total: (rows: R[]) => ReactNode };
+  /** rows can be put in a chosen order, kept in the sheet */
+  reorder?: ReorderableId;
 }
 
 const text = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : String(v));
@@ -197,6 +199,7 @@ export function buildViews(model: Model): View[] {
       edit: editRow('bankInr'),
       add: { kind: 'add', id: 'bankInr' },
       holders: byHolder('balance'),
+      reorder: 'bankInr',
       remove: (r) => ({ kind: 'remove', id: 'bankInr', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },
@@ -210,6 +213,7 @@ export function buildViews(model: Model): View[] {
       edit: editRow('bankAed'),
       add: { kind: 'add', id: 'bankAed' },
       holders: byHolder('balance', (n) => `AED ${num(n, 0)}`),
+      reorder: 'bankAed',
       remove: (r) => ({ kind: 'remove', id: 'bankAed', key: r._key }),
       columns: [
         { head: 'Account', name: true, render: (r) => text(r.account) },

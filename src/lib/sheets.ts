@@ -2,7 +2,7 @@
 
 import type { Grids } from './model';
 
-export interface SheetMeta { title: string; sheetId: number }
+export interface SheetMeta { title: string; sheetId: number; /** the tab's grid width */ columnCount?: number }
 export interface SheetData { values: Grids; formulas: Grids }
 
 interface GridRange { sheetId: number; startRowIndex: number; endRowIndex: number; startColumnIndex: number; endColumnIndex: number }
@@ -11,7 +11,9 @@ export interface UserEnteredValue { numberValue?: number; stringValue?: string; 
 /** The subset of spreadsheets.batchUpdate requests this app sends. */
 export type BatchRequest =
   | { insertDimension: { range: { sheetId: number; dimension: 'ROWS'; startIndex: number; endIndex: number }; inheritFromBefore: boolean } }
-  | { deleteDimension: { range: { sheetId: number; dimension: 'ROWS'; startIndex: number; endIndex: number } } }
+  | { deleteDimension: { range: { sheetId: number; dimension: 'ROWS' | 'COLUMNS'; startIndex: number; endIndex: number } } }
+  | { appendDimension: { sheetId: number; dimension: 'COLUMNS'; length: number } }
+  | { cutPaste: { source: GridRange; destination: { sheetId: number; rowIndex: number; columnIndex: number }; pasteType: 'PASTE_NORMAL' } }
   | { copyPaste: { source: GridRange; destination: GridRange; pasteType: 'PASTE_NORMAL' } }
   | {
     updateCells: {
@@ -70,10 +72,11 @@ export class GoogleSheets implements SheetsBackend {
   }
 
   async meta(): Promise<SheetMeta[]> {
-    const r = await this.call<{ properties: { title: string }; sheets: { properties: SheetMeta }[] }>(
-      '?fields=properties.title,sheets.properties(sheetId,title)');
+    type Props = { sheetId: number; title: string; gridProperties?: { columnCount?: number } };
+    const r = await this.call<{ properties: { title: string }; sheets: { properties: Props }[] }>(
+      '?fields=properties.title,sheets.properties(sheetId,title,gridProperties.columnCount)');
     this.title = r.properties.title;
-    return r.sheets.map((s) => s.properties);
+    return r.sheets.map(({ properties: p }) => ({ sheetId: p.sheetId, title: p.title, columnCount: p.gridProperties?.columnCount }));
   }
 
   async read(tabs: readonly string[], valuesOnly: readonly string[] = []): Promise<SheetData> {
