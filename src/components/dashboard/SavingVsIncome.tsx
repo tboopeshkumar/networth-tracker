@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { isNum, num } from '../../lib/format';
+import { isNum } from '../../lib/format';
 import type { Model } from '../../lib/model';
 import { savingByMonth, type SavingMonth } from '../../lib/savingRate';
 import { Amount, BTN_GHOST, Card, Label, PANEL, cx } from '../ui';
@@ -43,16 +43,16 @@ export function SavingVsIncome({ model }: { model: Model }) {
       <div className={cx('grid gap-2', hasPut && 'sm:grid-cols-2')}>
         <div className={cx(PANEL, 'px-3 py-2')}>
           <Label>Net worth change · last {year.n} months</Label>
-          <div className="mt-0.5 text-base font-semibold"><Amount value={year.saved} signed /> <span className="text-sm font-medium text-ink-3">of <Amount value={year.income} /> income</span></div>
-          <div className="text-xs text-ink-2"><Rate saved={year.saved} income={year.income} /> of income, market moves included</div>
+          <div className="mt-0.5 text-base font-semibold"><Amount value={year.saved} signed /></div>
+          <div className="text-xs text-ink-2"><Rate saved={year.saved} income={year.income} /> of income</div>
         </div>
         {hasPut && (
           <div className={cx(PANEL, 'px-3 py-2')}>
             <Label>Money put away{put.n ? ` · last ${put.n} month${put.n > 1 ? 's' : ''}` : ''}</Label>
             {put.n ? (
               <>
-                <div className="mt-0.5 text-base font-semibold"><Amount value={put.saved} signed /> <span className="text-sm font-medium text-ink-3">of <Amount value={put.income} /> income</span></div>
-                <div className="text-xs text-ink-2"><Rate saved={put.saved} income={put.income} /> of income, without market moves</div>
+                <div className="mt-0.5 text-base font-semibold"><Amount value={put.saved} signed /></div>
+                <div className="text-xs text-ink-2"><Rate saved={put.saved} income={put.income} /> of income</div>
               </>
             ) : <div className="mt-0.5 text-xs text-ink-2">{missing.length
               ? `Add ${missing.map(monthName).join(' and ')} income on the Income tab to compare.`
@@ -65,10 +65,7 @@ export function SavingVsIncome({ model }: { model: Model }) {
       <div className="-mx-4 mt-3.5 border-t border-line sm:hidden">
         {shown.map((m) => (
           <div key={m.month} className="border-b border-grid px-4 py-2.5 last:border-0">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-medium">{monthName(m)}</span>
-              <span className="text-xs text-ink-2 tabular-nums">{isNum(m.incomeAed) ? `income AED ${num(m.incomeAed, 0)}` : 'no income recorded'}</span>
-            </div>
+            <div className="font-medium">{monthName(m)}</div>
             <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-ink-2">
               <span>Net worth <b className="font-semibold text-ink">{isNum(m.netWorth) ? <Amount value={m.netWorth} signed /> : '—'}</b> <Rate saved={m.netWorth} income={m.incomeInr} /></span>
               {hasPut && <span>Put away <b className="font-semibold text-ink">{isNum(m.putAway) ? <Amount value={m.putAway} signed /> : '—'}</b> <Rate saved={m.putAway} income={m.incomeInr} /></span>}
@@ -83,7 +80,6 @@ export function SavingVsIncome({ model }: { model: Model }) {
           <thead>
             <tr>
               <th>Month</th>
-              <th className="num">Income (AED)</th>
               <th className="num">Net worth change</th>
               <th className="num">% of income</th>
               {hasPut && <th className="num">Put away</th>}
@@ -94,7 +90,6 @@ export function SavingVsIncome({ model }: { model: Model }) {
             {shown.map((m) => (
               <tr key={m.month}>
                 <td className="name">{monthName(m)}</td>
-                <td className={cx('num', !isNum(m.incomeAed) && 'text-ink-3')}>{isNum(m.incomeAed) ? num(m.incomeAed, 0) : '—'}</td>
                 <td className="num strong">{isNum(m.netWorth) ? <Amount value={m.netWorth} signed /> : '—'}</td>
                 <td className="num"><Rate saved={m.netWorth} income={m.incomeInr} /></td>
                 {hasPut && <td className="num strong">{isNum(m.putAway) ? <Amount value={m.putAway} signed /> : '—'}</td>}
