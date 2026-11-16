@@ -1,5 +1,5 @@
-import { IconArrowBarToUp, IconArrowDown, IconArrowUp, IconArrowsSort, IconCheck, IconChevronRight, IconPlus } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { IconArrowsSort, IconCheck, IconChevronRight, IconMenu2, IconPlus } from '@tabler/icons-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { inr, isNum } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Ledger, Model, Row } from '../../lib/model';
@@ -116,40 +116,105 @@ function GroupBand({ label, note, total }: { label: string; note: string | null;
   );
 }
 
-/** Choosing the order of a section's rows: up, down or to the top, then review before it's written. */
+/**
+ * Choosing the order of a section's rows, as in iOS lists: drag a row by its
+ * handle and the others make room. The page scrolls while a row is held near
+ * the top or bottom edge. The handle also takes the arrow keys. Then review
+ * before it's written.
+ */
 function Arrange({ view: v, order, setOrder, onReview }: { view: View; order: string[]; setOrder: (o: string[] | null) => void; onReview: () => void }) {
   const byKey = new Map(v.recs.map((r) => [r._key, r]));
   const moved = order.join('\n') !== v.recs.map((r) => r._key).join('\n');
   const move = (from: number, to: number) => {
+    if (from === to || to < 0 || to >= order.length) return;
     const next = [...order];
     const [key] = next.splice(from, 1);
     next.splice(to, 0, key);
     setOrder(next);
   };
-  const icon = 'grid size-8 flex-none cursor-pointer place-items-center rounded-md text-ink-2 hover:bg-sunk hover:text-ink disabled:cursor-default disabled:opacity-30';
+
+  // While dragging: the held row follows the pointer; `over` is where it would land
+  const items = useRef<(HTMLLIElement | null)[]>([]);
+  const [drag, setDrag] = useState<{ from: number; dy: number; over: number; h: number } | null>(null);
+  const live = useRef<{ from: number; startY: number; startScroll: number; y: number; tops: number[]; heights: number[]; over: number; raf: number } | null>(null);
+  useEffect(() => () => { if (live.current) cancelAnimationFrame(live.current.raf); }, []);
+
+  const follow = () => {
+    const d = live.current;
+    if (!d) return;
+    const dy = d.y - d.startY + (window.scrollY - d.startScroll);
+    const centre = d.tops[d.from] + dy + d.heights[d.from] / 2;
+    d.over = d.tops.reduce((n, top, i) => (i !== d.from && top + d.heights[i] / 2 < centre ? n + 1 : n), 0);
+    setDrag({ from: d.from, dy, over: d.over, h: d.heights[d.from] });
+  };
+  // Near the screen's top or bottom edge, scroll, faster the closer the pointer
+  const scroll = () => {
+    const d = live.current;
+    if (!d) return;
+    const edge = 72;
+    const speed = d.y < edge ? -(edge - d.y) / 5 : d.y > window.innerHeight - edge ? (d.y - window.innerHeight + edge) / 5 : 0;
+    if (speed) { window.scrollBy(0, speed); follow(); }
+    d.raf = requestAnimationFrame(scroll);
+  };
+  const pickUp = (i: number, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rects = items.current.slice(0, order.length).map((el) => el!.getBoundingClientRect());
+    live.current = { from: i, startY: e.clientY, startScroll: window.scrollY, y: e.clientY, tops: rects.map((r) => r.top + window.scrollY), heights: rects.map((r) => r.height), over: i, raf: 0 };
+    live.current.raf = requestAnimationFrame(scroll);
+    setDrag({ from: i, dy: 0, over: i, h: rects[i].height });
+  };
+  const drop = () => {
+    const d = live.current;
+    if (!d) return;
+    cancelAnimationFrame(d.raf);
+    live.current = null;
+    setDrag(null);
+    move(d.from, d.over);
+  };
+  const shift = (i: number) => {
+    if (!drag) return 0;
+    if (i === drag.from) return drag.dy;
+    if (drag.from < drag.over && i > drag.from && i <= drag.over) return -drag.h;
+    if (drag.over < drag.from && i >= drag.over && i < drag.from) return drag.h;
+    return 0;
+  };
+
+  const icon = 'grid size-10 flex-none place-items-center rounded-md text-ink-3 hover:bg-sunk hover:text-ink';
   return (
     <div className="pb-1 pt-1">
-      <p className="mb-2 text-xs text-ink-2">Put the accounts in the order you want, then review. The rows move in your sheet, so every device shows this order.</p>
-      <ol className={cx(PANEL, 'divide-y divide-line overflow-hidden bg-surface')}>
+      <p className="mb-2 text-xs text-ink-2">Drag ☰ to put the accounts in the order you want, then review. The rows move in your sheet, so every device shows this order.</p>
+      <ol className={cx(PANEL, 'bg-surface', !drag && 'overflow-hidden', drag && 'select-none')}>
         {order.map((key, i) => {
           const c = v.card(byKey.get(key)!);
           const label = String(byKey.get(key)!.account ?? '');
+          const held = drag?.from === i;
           return (
-            <li key={key} className="flex items-center gap-2 py-1 pl-3 pr-1 text-[13px]">
+            <li
+              key={key} ref={(el) => { items.current[i] = el; }}
+              className={cx('relative flex items-center gap-2 border-b border-line bg-surface py-1 pl-3 pr-1 text-[13px] last:border-0',
+                held ? 'z-10 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.22)]' : 'transition-transform duration-150 motion-reduce:transition-none')}
+              style={{ transform: shift(i) ? `translateY(${shift(i)}px)${held ? ' scale(1.02)' : ''}` : undefined }}
+            >
               <span className="w-5 flex-none text-xs text-ink-3 tabular-nums">{i + 1}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{c.title}</span>
                 <span className="block truncate text-xs text-ink-2">{c.sub}</span>
               </span>
               <span className="hidden whitespace-nowrap tabular-nums text-ink-2 sm:inline">{c.value}</span>
-              <button type="button" className={icon} disabled={i === 0} onClick={() => move(i, 0)} aria-label={`Move ${label} to the top`} title="Move to the top">
-                <IconArrowBarToUp size={16} stroke={1.75} aria-hidden="true" />
-              </button>
-              <button type="button" className={icon} disabled={i === 0} onClick={() => move(i, i - 1)} aria-label={`Move ${label} up`} title="Move up">
-                <IconArrowUp size={16} stroke={1.75} aria-hidden="true" />
-              </button>
-              <button type="button" className={icon} disabled={i === order.length - 1} onClick={() => move(i, i + 1)} aria-label={`Move ${label} down`} title="Move down">
-                <IconArrowDown size={16} stroke={1.75} aria-hidden="true" />
+              <button
+                type="button" className={cx(icon, 'touch-none', held ? 'cursor-grabbing text-ink' : 'cursor-grab')}
+                aria-label={`Reorder ${label}: drag, or use the up and down arrow keys`} title="Drag to reorder"
+                onPointerDown={(e) => pickUp(i, e)}
+                onPointerMove={(e) => { if (live.current) { live.current.y = e.clientY; follow(); } }}
+                onPointerUp={drop} onPointerCancel={drop}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp') { e.preventDefault(); move(i, i - 1); }
+                  if (e.key === 'ArrowDown') { e.preventDefault(); move(i, i + 1); }
+                }}
+              >
+                <IconMenu2 size={18} stroke={1.75} aria-hidden="true" />
               </button>
             </li>
           );
@@ -157,7 +222,7 @@ function Arrange({ view: v, order, setOrder, onReview }: { view: View; order: st
       </ol>
       <div className="mt-2.5 flex justify-end gap-2">
         <button type="button" className={BTN} onClick={() => setOrder(null)}>Cancel</button>
-        <button type="button" className={BTN_PRIMARY} disabled={!moved} onClick={onReview}>Review order</button>
+        <button type="button" className={BTN_PRIMARY} disabled={!moved || !!drag} onClick={onReview}>Review order</button>
       </div>
     </div>
   );
