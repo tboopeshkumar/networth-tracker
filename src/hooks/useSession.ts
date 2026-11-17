@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CONFIG, isConfigured } from '../config';
 import { accessFor } from '../lib/access';
-import { disconnect, getToken, initAuth, signIn, signOut } from '../lib/auth';
+import { disconnect, getToken, initAuth, returnedSignIn, signIn, signOut } from '../lib/auth';
 import { parseSheetId, pickSpreadsheet, rememberSheet, rememberedSheet } from '../lib/picker';
 import { forgetAllTabs } from '../lib/tabCache';
 import { AccessError, AuthError, GoogleSheets, type SheetsBackend } from '../lib/sheets';
@@ -61,7 +61,20 @@ export function useSession(toast: Toast) {
     }
   }, [fail, toast]);
 
-  // Boot: demo fixture in development, otherwise load Google sign-in
+  /** An account Google has just confirmed: check it may use the app, then open its sheet, or ask for one. */
+  const finishSignIn = useCallback(async (email: string) => {
+    const access = accessFor(email, { allowed: CONFIG.allowedEmails, editors: CONFIG.editorEmails });
+    if (!access.allowed) {
+      signOut();
+      throw new Error(`${email} isn't set up for this app.`);
+    }
+    setIdentity({ email, canEdit: access.canEdit });
+    const sheet = rememberedSheet(email);
+    if (sheet) await open(new GoogleSheets(sheet.id, getToken), email);
+    else setPhase('pick');
+  }, [open]);
+
+  // Boot: demo fixture in development, otherwise sign-in (or finishing one Google has just returned from)
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -79,35 +92,31 @@ export function useSession(toast: Toast) {
         return;
       }
       if (!isConfigured()) { setPhase('setup'); return; }
-      setPhase('signin');
-      try {
-        await initAuth(CONFIG.clientId);
-        if (!cancelled) setAuthReady(true);
-      } catch (e) {
-        fail(e);
+      // Only for revoking access later; sign-in doesn't wait for it
+      initAuth().catch(() => { /* revoke falls back to forgetting the token */ });
+      setAuthReady(true);
+      // Back from Google's sign-in: finish it, then open the sheet as usual
+      const back = returnedSignIn();
+      if (back) {
+        try {
+          const email = await back;
+          if (email && !cancelled) await finishSignIn(email);
+          return;
+        } catch (e) {
+          if (!cancelled) { setPhase('signin'); fail(e); }
+          return;
+        }
       }
+      setPhase('signin');
     })();
     return () => { cancelled = true; };
-  }, [open, fail]);
+  }, [open, fail, finishSignIn]);
 
-  // Called from a click handler so the browser allows the sign-in popup
+  // The tab goes to Google's sign-in and comes back to the boot step above
   const startSignIn = useCallback(() => {
     setBusy(true);
-    signIn()
-      .then(async (email) => {
-        const access = accessFor(email, { allowed: CONFIG.allowedEmails, editors: CONFIG.editorEmails });
-        if (!access.allowed) {
-          signOut();
-          throw new Error(`${email} isn't set up for this app.`);
-        }
-        setIdentity({ email, canEdit: access.canEdit });
-        const sheet = rememberedSheet(email);
-        if (sheet) await open(new GoogleSheets(sheet.id, getToken), email);
-        else setPhase('pick');
-      })
-      .catch(fail)
-      .finally(() => setBusy(false));
-  }, [open, fail]);
+    signIn(CONFIG.clientId);
+  }, []);
 
   const pick = useCallback(async () => {
     const token = getToken();

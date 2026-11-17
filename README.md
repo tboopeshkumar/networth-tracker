@@ -79,7 +79,11 @@ Keep the app in **Testing**: the test-user list is a gate that Google enforces.
   - `http://localhost:8080` (local development)
 
   Enter the origin only: no path and no trailing `/`.
-- Leave *Authorized redirect URIs* empty, click **Create**, and copy the **Client ID**.
+- Authorized redirect URIs: sign-in happens in the app's own tab, and Google sends it back to the app's address, so add exactly
+  - `https://USERNAME.github.io/REPO/` (with the trailing `/`)
+  - `http://localhost:8080/` (local development)
+
+  Then click **Create**, and copy the **Client ID**.
 - Ignore any client secret (`GOCSPX-…`). The app never uses one.
 - New origins can take from 5 minutes to a few hours to start working.
 
