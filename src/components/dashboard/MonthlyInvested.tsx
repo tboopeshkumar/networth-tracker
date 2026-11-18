@@ -1,16 +1,16 @@
 import { useMemo } from 'react';
-import { fmtDay, isNum, isoToSerial, n0, num, signedInr } from '../../lib/format';
+import { fmtDay, isNum, isoToSerial, n0, num, signedCr, signedInr } from '../../lib/format';
 import type { Model } from '../../lib/model';
 import { monthlyInvested, type MonthRow, type Series } from '../../lib/monthlyInvested';
-import { Amount, Card, cx } from '../ui';
+import { Amount, FoldCard, cx } from '../ui';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (m: string) => `${MON[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 
 /** A month's change in a series' own currency, signed; a dash where there's nothing to show. */
-function money(v: number | null | undefined, currency: string): string {
+function money(v: number | null | undefined, currency: string, compact = false): string {
   if (!isNum(v) || Math.abs(v) < 1) return '—';
-  if (currency === 'INR') return signedInr(v);
+  if (currency === 'INR') return compact ? signedCr(v) : signedInr(v);
   const n = `${currency === 'USD' ? '$' : `${currency} `}${num(Math.abs(v), 0)}`;
   return `${v > 0 ? '+' : '−'}${n}`;
 }
@@ -45,21 +45,37 @@ export function MonthlyInvested({ model }: { model: Model }) {
   // Only beside a figure: the month it covers began part-way, when the log did
   const note = (row: MonthRow, s: Series) => isNum(row.values[s.key]) && row.from[s.key] !== undefined && row.from[s.key] > isoToSerial(`${row.month}-01`) ? `from ${fmtDay(row.from[s.key])}` : null;
 
+  // Closed, the card says what's gone in this month so far (or last month, if nothing yet)
+  const lead = months.find((r) => isNum(total(r))) ?? months[0];
+  const summary = lead && isNum(total(lead))
+    ? <>{label(lead)}: <b className="font-semibold text-ink">≈ <Amount value={total(lead)} signed /></b></>
+    : 'Nothing recorded yet this month';
+  const unit = (s: Series) => (s.currency === 'INR' ? '₹' : s.currency === 'USD' ? '$' : s.currency);
+  // Phones: the month, then one column per platform, so months compare down each column
+  // Fixed widths, so each month's figures sit under the same heading as every other month's
+  const cols = `minmax(0,1fr) repeat(${series.length}, ${series.length > 2 ? '4.5rem' : '6rem'})`;
+
   return (
-    <Card title="Invested each month" sub={`What went into each, by month: ${series.map((s) => `${s.label} since ${fmtDay(s.since)}`).join(' · ')}`}>
-      {/* Phones: a block per month */}
-      <div className="-mx-4 -mb-4 overflow-hidden rounded-b-xl border-t border-line sm:hidden">
+    <FoldCard title="Invested each month" summary={summary}>
+      <p className="mb-3 text-xs text-ink-3">{series.map((s) => `${s.label} since ${fmtDay(s.since)}`).join(' · ')}</p>
+      <div className="-mx-4 border-t border-line sm:hidden">
+        <div className="grid items-baseline gap-x-2 border-b border-line px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-ink-3" style={{ gridTemplateColumns: cols }}>
+          <span>Month</span>
+          {series.map((s) => <span key={s.key} className="text-right">{s.key === 'mf' ? 'Funds' : s.label} ({unit(s)})</span>)}
+        </div>
         {months.map((row) => (
-          <div key={row.month} className="border-b border-grid px-4 py-2.5 last:border-0">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-medium">{label(row)}</span>
-              <span className="font-semibold tabular-nums">{isNum(total(row)) ? <>≈ <Amount value={total(row)} signed /></> : '—'}</span>
-            </div>
-            <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-2 tabular-nums">
-              {series.map((s) => (
-                <span key={s.key}>{s.label} <b className="font-semibold text-ink">{money(row.values[s.key], s.currency)}</b>{note(row, s) && <span className="text-ink-3"> ({note(row, s)})</span>}</span>
-              ))}
-            </div>
+          <div key={row.month} className="grid items-baseline gap-x-2 border-b border-grid px-4 py-2.5 last:border-0" style={{ gridTemplateColumns: cols }}>
+            <span className="min-w-0">
+              <span className="block whitespace-nowrap font-medium">{MON[Number(row.month.slice(5, 7)) - 1]}{row.current ? '' : ` ’${row.month.slice(2, 4)}`}</span>
+              {row.current && <span className="block text-xs text-ink-3">so far</span>}
+              {series.length > 1 && isNum(total(row)) && <span className="block whitespace-nowrap text-xs text-ink-3 tabular-nums">≈ <Amount value={total(row)} signed /></span>}
+            </span>
+            {series.map((s) => (
+              <span key={s.key} className={cx('whitespace-nowrap text-right tabular-nums', isNum(row.values[s.key]) ? 'font-semibold' : 'text-ink-3')}>
+                {money(row.values[s.key], s.currency, true)}
+                {note(row, s) && <span className="block text-[11px] font-normal text-ink-3">{note(row, s)}</span>}
+              </span>
+            ))}
           </div>
         ))}
       </div>
@@ -91,12 +107,12 @@ export function MonthlyInvested({ model }: { model: Model }) {
         </table>
       </div>
 
-      <ul className="mt-3 space-y-0.5 text-xs text-ink-3 max-sm:mt-6">
+      <ul className="mt-3 space-y-0.5 text-xs text-ink-3">
         {series.some((s) => s.key === 'mf') && <li><b className="font-medium text-ink-2">Mutual funds:</b> counted once their Invested amount is updated, e.g. by Import CAS.</li>}
         {brokers.length > 0 && <li><b className="font-medium text-ink-2">{brokers.join(' and ')}:</b> include profit from sales left in the account.</li>}
         {exact.length > 0 && <li><b className="font-medium text-ink-2">{exact.join(' and ')}:</b> actual deposits, minus withdrawals.</li>}
         <li><b className="font-medium text-ink-2">Total:</b> converted to ₹ at today’s rates.</li>
       </ul>
-    </Card>
+    </FoldCard>
   );
 }

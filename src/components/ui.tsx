@@ -1,4 +1,4 @@
-import { IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconChevronDown, IconPencil, IconTrash } from '@tabler/icons-react';
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { cr, inr, isNum, signedCr, signedInr } from '../lib/format';
 import type { EditRequest } from '../lib/editors';
@@ -67,6 +67,25 @@ export function AmcBadge({ fund, size = 24 }: { fund: unknown; size?: number }) 
 /* ---------- surfaces ---------- */
 
 export const CARD = 'rounded-xl border border-line bg-surface shadow-card';
+/**
+ * A card that starts closed: its title and a one-line summary, tap to open.
+ * For history that's looked at now and then rather than every visit.
+ */
+export function FoldCard({ title, summary, children }: { title: ReactNode; summary?: ReactNode; children: ReactNode }) {
+  return (
+    <details className={cx(CARD, 'group mb-3 sm:mb-4')}>
+      <summary className="flex cursor-pointer select-none list-none items-center gap-3 rounded-xl p-4 transition-colors hover:bg-sunk/50 sm:p-5 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+          {summary && <p className="mt-0.5 text-xs text-ink-2">{summary}</p>}
+        </div>
+        <IconChevronDown size={18} stroke={1.75} className="flex-none text-ink-3 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div>
+    </details>
+  );
+}
+
 /** A panel inside a card: stats, tiles, the gold valuation. */
 export const PANEL = 'rounded-lg border border-line bg-sunk';
 
