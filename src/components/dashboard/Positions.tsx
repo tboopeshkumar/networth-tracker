@@ -2,7 +2,7 @@ import { IconChevronRight } from '@tabler/icons-react';
 import { join, ret, n0, signedPct, tone, signedCr } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Model, NetWorthRow } from '../../lib/model';
-import { Amount, CATEGORY_SLOT, Card, Pill, Swatch, cx } from '../ui';
+import { Amount, CATEGORY_SLOT, FoldCard, Pill, Swatch, cx } from '../ui';
 
 interface Props {
   model: Model;
@@ -25,7 +25,8 @@ export function Positions({ model, linkOf, onDrill }: Props) {
   const rows = [...model.rows.networth].sort((a, b) => n0(b.current) - n0(a.current));
 
   return (
-    <Card title="All positions" sub="The lines that roll up into your total, computed in the sheet. Tap a line to see its holdings.">
+    // Closed by default: how many lines and what they add up to; tap to see them
+    <FoldCard title="All positions" summary={<>{rows.length} lines · <b className="font-semibold text-ink"><Amount value={T.current} /></b></>}>
       {/* Runs to the card's bottom edge, so the Total row closes the card */}
       <div className="-mx-4 -mb-4 overflow-hidden rounded-b-xl sm:-mx-5 sm:-mb-5">
         <div className={cx(GRID, 'border-b border-line px-4 pb-2 text-[11px] font-medium uppercase tracking-wide text-ink-3 sm:px-5')}>
@@ -73,6 +74,6 @@ export function Positions({ model, linkOf, onDrill }: Props) {
           <span className="hidden text-right sm:block"><ReturnPill pnl={T.pnl} invested={T.invested} /></span>
         </div>
       </div>
-    </Card>
+    </FoldCard>
   );
 }
