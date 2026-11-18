@@ -124,11 +124,6 @@ export function SavingVsIncome({ model }: { model: Model }) {
         <button type="button" className={cx(BTN_GHOST, 'mt-1')} onClick={() => setAll(!all)}>{all ? 'Show the last 12 months' : `Show all ${months.length} months`}</button>
       )}
 
-      <ul className="mt-3 space-y-0.5 text-xs text-ink-3">
-        <li><b className="font-medium text-ink-2">Net worth change:</b> from the Monthly Trend tab; includes market and exchange-rate moves.</li>
-        {hasPut && <li><b className="font-medium text-ink-2">Put away:</b> the rise in invested capital, from the daily log; leaves those moves out.</li>}
-        <li><b className="font-medium text-ink-2">Income:</b> from the Income tab, converted to ₹ at today’s rate.</li>
-      </ul>
     </FoldCard>
   );
 }
