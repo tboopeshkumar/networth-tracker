@@ -281,6 +281,10 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
+### Credit cards
+
+A `Credit Cards` tab headed **Card | Type | Limit (AED)**, one row per card, shows under Holdings → Credit cards, with add, edit and delete. Limits are for reference: they're part of no total and don't change your net worth. Card bills you owe belong in the Dues tables.
+
 ### Price history
 
 `RatesFeed.gs` also keeps a `Rates History` tab: one row per day with AED → INR, Gold 22C and Gold 999. Its first run fills in about a month at once (Gulf News lists 30 days of 22C prices, and Google Finance has past USD → INR closes); after that each daily refresh adds a row, and rows older than 400 days are removed. The app charts the last 30 days under **Price movements**: the AED → INR rate, and the gold valuation (your grams × that day's 22C rate). No setup beyond pasting the updated `RatesFeed.gs` and running **Refresh gold & AED rates now** once.

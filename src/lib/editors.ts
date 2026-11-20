@@ -34,8 +34,8 @@ export interface Field {
   plain?: boolean;
 }
 
-export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate';
-export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
+export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
+export type AddableId = 'mf' | 'fd' | 'goldUae' | 'silverUae' | 'trend' | 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
 export type CellPath =
   | 'cells.fxAedInr' | 'cells.fxUsdAed' | 'cells.npsInvested' | 'cells.npsGain'
   | 'summaries.goldUae.currentAed' | 'summaries.silverUae.sellPrice';
@@ -52,7 +52,7 @@ export type EditRequest =
 export type ReorderableId = 'bankInr' | 'bankAed';
 
 /** Rows the app offers to delete: plain lists with nothing hanging off them. */
-export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate';
+export type RemovableRow = 'bankInr' | 'bankAed' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
 
 export type Values = Record<string, string>;
 
@@ -170,6 +170,14 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
     case 'bankAed':
       name = `${rec.account} · ${rec.holder}`;
       fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder / notes', rec.holder), money('balance', 'Balance (AED)', rec.balance, { aed: true })];
+      break;
+    case 'cards':
+      name = String(rec.card);
+      fields = [
+        text('card', 'Card', rec.card, { required: true }),
+        text('type', 'Type', rec.type, { list: uniq(model.rows.cards.map((r) => r.type)) }),
+        money('limit', 'Limit (AED)', rec.limit, { aed: true }),
+      ];
       break;
     case 'realEstate':
       name = String(rec.property);
@@ -440,6 +448,13 @@ function addEditor(model: Model, data: SheetData, id: AddableId | LedgerId): Edi
         },
       };
     }
+    case 'cards':
+      if (!model.tables.cards) throw new Error('That table is no longer in the sheet. Refresh and try again.');
+      return simple('cards', 'Add credit card', [
+        text('card', 'Card', '', { required: true }),
+        text('type', 'Type', '', { list: uniq(model.rows.cards.map((r) => r.type)) }),
+        money('limit', 'Limit (AED)', '', { required: true, aed: true }),
+      ], 'Added at the end of the list.');
     case 'realEstate': {
       const rows = model.rows.realEstate;
       const tbl = model.tables.realEstate;
@@ -515,6 +530,16 @@ function removeEditor(model: Model, id: RemovableRow | LedgerId, rec: Row | unde
             : [],
         };
       },
+    };
+  }
+  if (id === 'cards') {
+    const title = `Delete ${String(rec.card)}`;
+    return {
+      title,
+      danger: true,
+      hint: `Removes this card's row from ${tbl.spec.tab}. Card limits aren't part of your net worth, so nothing else changes.`,
+      fields: [],
+      build: () => ({ plan: planRemove(model, id, rec, title), warn: [] }),
     };
   }
   const due = id === 'duesInr' || id === 'duesAed';

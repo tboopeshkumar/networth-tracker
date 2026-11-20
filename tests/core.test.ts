@@ -435,6 +435,38 @@ withFixture('ledger entries can be added and deleted, and a delete takes its who
   }
 });
 
+withFixture('credit cards can be added, edited and deleted, and touch no total', async () => {
+  const f = fixture();
+  const tab = 'Credit Cards';
+  const grid: Cell[][] = [['Card', 'Type', 'Limit (AED)'], ['Example One Card', 'Visa Platinum', 10000], ['Example Two Card', 'Master World', 5000]];
+  f.values[tab] = grid.map((r) => [...r]);
+  f.formulas[tab] = grid.map((r) => [...r]);
+  f.sheets.push({ title: tab, sheetId: 4242 });
+  const demo = new DemoSheets(f);
+  const totals = (await loadAll(demo)).model.totals;
+
+  let { model, data } = await loadAll(demo);
+  assert.deepEqual(model.rows.cards.map((r) => [r.card, r.limit]), [['Example One Card', 10000], ['Example Two Card', 5000]]);
+  const add = editorFor(model, data, { kind: 'add', id: 'cards' });
+  assert.deepEqual(add.fields.map((x) => x.name), ['card', 'type', 'limit']);
+  await execute(demo, add.build({ card: 'Example Three Card', type: 'Visa Infinite', limit: '20000' }).plan);
+
+  ({ model, data } = await loadAll(demo));
+  const two = model.rows.cards.find((r) => r.card === 'Example Two Card')!;
+  await execute(demo, editorFor(model, data, { kind: 'row', id: 'cards', key: two._key }).build({ card: 'Example Two Card', type: 'Master World', limit: '7500' }).plan);
+
+  ({ model, data } = await loadAll(demo));
+  const one = model.rows.cards.find((r) => r.card === 'Example One Card')!;
+  const del = editorFor(model, data, { kind: 'remove', id: 'cards', key: one._key });
+  assert.equal(del.danger, true);
+  assert.deepEqual(del.build({}).warn, [], 'no warning: limits are part of no total');
+  await execute(demo, del.build({}).plan);
+
+  const after = (await loadAll(demo)).model;
+  assert.deepEqual(after.rows.cards.map((r) => [r.card, r.type, r.limit]), [['Example Two Card', 'Master World', 7500], ['Example Three Card', 'Visa Infinite', 20000]]);
+  assert.deepEqual(after.totals, totals, 'net worth unchanged');
+});
+
 withFixture('reordering bank accounts moves whole rows within their table, and nothing else', async () => {
   const demo = new DemoSheets(fixture());
   const { model, data, meta } = await loadAll(demo);

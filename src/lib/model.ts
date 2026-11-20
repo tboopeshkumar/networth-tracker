@@ -131,6 +131,11 @@ export const SPECS = {
     tab: 'NPS', anchor: 'schemeId', key: ['schemeId'], end: null, optional: true,
     headers: { schemeId: 'Scheme ID', scheme: 'Scheme', units: 'Units', nav: 'NAV', value: 'Value', navDate: 'NAV date' },
   }),
+  // Credit cards and their limits, in AED: reference only, part of no total
+  cards: spec({
+    tab: 'Credit Cards', anchor: 'limit', key: ['card'], end: /^total/i, optional: true,
+    headers: { card: 'Card', type: 'Type', limit: 'Limit (AED)' },
+  }),
   // Fractional property shares, valued in AED; the tab's total is what Net Worth reads
   realEstate: spec({
     tab: 'Real Estate', anchor: 'property', key: ['provider', 'property'], end: /^total/i, optional: true,
@@ -150,7 +155,7 @@ export const SPECS = {
 export const VALUES_ONLY_TABS: readonly string[] = [RATES_TAB, ETORO_TAB, IBKR_TAB, IBKR_DEPOSITS_TAB, DAILY_TAB, STATUS_TAB, HISTORY_TAB, INCOME_TAB];
 
 /** Read when present; a sheet without them still loads. */
-export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB, IBKR_DEPOSITS_TAB, INCOME_TAB] as const;
+export const OPTIONAL_TABS = [JEWELLERY_TAB, RATES_TAB, ETORO_TAB, IBKR_TAB, SPECS.realEstate.tab, DAILY_TAB, STATUS_TAB, HISTORY_TAB, IBKR_DEPOSITS_TAB, INCOME_TAB, SPECS.cards.tab] as const;
 
 // Ledger tabs aren't named here: each family-loan row in Receivables names its
 // own ledger in the "Detail Sheet" column, and those tabs are read on demand.
@@ -228,7 +233,7 @@ const AS_OF = /^(valued on|as of|updated|last updated)\b/i;
 export type CellId = 'fxAedInr' | 'fxUsdAed' | 'npsInvested' | 'npsGain' | 'npsAsOf';
 export type SummaryId = 'goldUae' | 'silverUae';
 
-type OptionalId = 'givenOut' | 'familyLoans' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate';
+type OptionalId = 'givenOut' | 'familyLoans' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
 
 export interface Model {
   tables: { [I in Exclude<SpecId, OptionalId>]: Table } & { [I in OptionalId]: Table | null };

@@ -194,6 +194,7 @@ export function buildViews(model: Model): View[] {
       },
     }),
     ...realEstateView(model),
+    ...cardsView(model),
     view<RowOf<'bankInr'>>({
       id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: <Amount value={sum(R.bankInr, 'balance')} />,
       edit: editRow('bankInr'),
@@ -314,6 +315,24 @@ export function buildViews(model: Model): View[] {
   });
 
   return views;
+}
+
+/** Credit cards and their limits: reference only, so the section adds to no total. */
+function cardsView(model: Model): View[] {
+  if (!model.tables.cards) return [];
+  const recs = model.rows.cards;
+  const aed = (n: unknown) => (isNum(n) ? `AED ${num(n, 0)}` : '—');
+  return [view<RowOf<'cards'>>({
+    id: 'cards', group: 'Credit cards', name: 'Cards', recs, total: aed(sum(recs, 'limit')),
+    edit: editRow('cards'), add: { kind: 'add', id: 'cards' },
+    remove: (r) => ({ kind: 'remove', id: 'cards', key: r._key }),
+    columns: [
+      { head: 'Card', name: true, render: (r) => text(r.card) },
+      { head: 'Type', render: (r) => text(r.type) },
+      { head: 'Limit (AED)', num: true, render: (r) => aed(r.limit), className: () => 'strong' },
+    ],
+    card: (r) => ({ title: text(r.card), value: aed(r.limit), sub: text(r.type) }),
+  })];
 }
 
 /** Fractional property shares, valued in AED: the section's total is shown in rupees like the rest of Investments. */
@@ -474,7 +493,7 @@ function brokerView(model: Model, feed: BrokerFeed | null, id: 'etoro' | 'ibkr',
 }
 
 export const JEWELLERY_GROUP = 'Jewellery · not in net worth';
-export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent', JEWELLERY_GROUP];
+export const GROUP_ORDER = ['Investments', 'Cash', 'Metals · UAE', 'Money lent', 'Credit cards', JEWELLERY_GROUP];
 
 /** A line under a group's heading, where the group needs explaining. */
 /** A group's worth in rupees: only when every section in it has one (grams and ounces don't add up). */
@@ -484,6 +503,7 @@ export function groupInr(views: View[]): number | undefined {
 
 export function groupNote(model: Model, group: string): string | null {
   if (group === JEWELLERY_GROUP && model.jewellery) return 'For reference only — not counted in your net worth.';
+  if (group === 'Credit cards') return 'Limits, for reference — not counted in your net worth.';
   if (group === 'Cash' && (model.tables.duesInr || model.tables.duesAed)) return 'Dues are deducted from the matching bank total.';
   return null;
 }

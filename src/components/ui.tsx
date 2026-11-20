@@ -24,7 +24,7 @@ export const tintInk = (slot: number) => `color-mix(in srgb, var(--s${slot}) 62%
 
 /** Each holdings group takes the colour of the asset class it mostly is. */
 export const GROUP_SLOT: Record<string, number> = {
-  Investments: 2, Cash: 1, 'Metals · UAE': 4, 'Money lent': 7,
+  Investments: 2, Cash: 1, 'Metals · UAE': 4, 'Money lent': 7, 'Credit cards': 6,
 };
 
 export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
