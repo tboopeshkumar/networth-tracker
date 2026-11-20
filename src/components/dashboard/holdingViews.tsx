@@ -49,6 +49,8 @@ export interface View<R extends Row = Row> {
   /** present when rows can be added: the header's + button */
   add?: EditRequest;
   ledger?: Ledger;
+  /** rows shown greyed out, e.g. a closed card */
+  muted?: (r: R) => boolean;
   /** a line above the rows, for figures that belong to the section rather than a row */
   lead?: ReactNode;
   /** rows can be narrowed to one holder: whose a row is, and what a narrowed list adds up to */
@@ -320,18 +322,29 @@ export function buildViews(model: Model): View[] {
 /** Credit cards and their limits: reference only, so the section adds to no total. */
 function cardsView(model: Model): View[] {
   if (!model.tables.cards) return [];
-  const recs = model.rows.cards;
+  type CardRow = RowOf<'cards'> & { closed?: Cell };
+  const closed = (r: CardRow) => r.closed !== undefined && r.closed !== '' && r.closed !== null;
+  // Open cards first, closed ones after, each in the sheet's order
+  const all = model.rows.cards as CardRow[];
+  const recs = [...all.filter((r) => !closed(r)), ...all.filter(closed)];
   const aed = (n: unknown) => (isNum(n) ? `AED ${num(n, 0)}` : '—');
-  return [view<RowOf<'cards'>>({
-    id: 'cards', group: 'Credit cards', name: 'Cards', recs, total: aed(sum(recs, 'limit')),
+  // With the year: a closed card can be from any year
+  const when = (r: CardRow) => (isNum(r.closed) ? fmtDate(r.closed) : text(r.closed));
+  const hasClosed = model.tables.cards.cols.closed !== undefined;
+  return [view<CardRow>({
+    id: 'cards', group: 'Credit cards', name: 'Cards', recs,
+    // The limit you can use: open cards only
+    total: aed(sum(recs.filter((r) => !closed(r)), 'limit')),
+    muted: closed,
     edit: editRow('cards'), add: { kind: 'add', id: 'cards' },
     remove: (r) => ({ kind: 'remove', id: 'cards', key: r._key }),
     columns: [
       { head: 'Card', name: true, render: (r) => text(r.card) },
       { head: 'Type', render: (r) => text(r.type) },
       { head: 'Limit (AED)', num: true, render: (r) => aed(r.limit), className: () => 'strong' },
+      ...(hasClosed ? [{ head: 'Closed', render: (r: CardRow) => (closed(r) ? when(r) : '—') }] : []),
     ],
-    card: (r) => ({ title: text(r.card), value: aed(r.limit), sub: text(r.type) }),
+    card: (r) => ({ title: text(r.card), value: aed(r.limit), sub: closed(r) ? `${text(r.type)} · Closed ${when(r)}` : text(r.type) }),
   })];
 }
 

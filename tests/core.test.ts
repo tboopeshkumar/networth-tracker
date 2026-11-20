@@ -19,6 +19,7 @@ import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
 import { readBrokerFeed } from '../src/lib/brokerFeed';
 import { buildModel, parseRef, totalDrift, TABS, type Row } from '../src/lib/model';
 import { makeLinker } from '../src/lib/links';
+import { buildViews } from '../src/components/dashboard/holdingViews';
 import { amcOf } from '../src/lib/amc';
 import { parseSheetId } from '../src/lib/picker';
 import {
@@ -465,6 +466,40 @@ withFixture('credit cards can be added, edited and deleted, and touch no total',
   const after = (await loadAll(demo)).model;
   assert.deepEqual(after.rows.cards.map((r) => [r.card, r.type, r.limit]), [['Example Two Card', 'Master World', 7500], ['Example Three Card', 'Visa Infinite', 20000]]);
   assert.deepEqual(after.totals, totals, 'net worth unchanged');
+});
+
+withFixture('a closed card is greyed, listed last, left out of the total, and can be reopened', async () => {
+  const f = fixture();
+  const tab = 'Credit Cards';
+  const grid: Cell[][] = [['Card', 'Type', 'Limit (AED)', 'Closed On'], ['Card A', 'Visa', 10000, ''], ['Card B', 'Master', 5000, ''], ['Card C', 'Visa', 2000, '']];
+  f.values[tab] = grid.map((r) => [...r]);
+  f.formulas[tab] = grid.map((r) => [...r]);
+  f.sheets.push({ title: tab, sheetId: 4244 });
+  const demo = new DemoSheets(f);
+  const view = (m: Awaited<ReturnType<typeof loadAll>>['model']) => buildViews(m).find((v) => v.id === 'cards')!;
+
+  let { model, data } = await loadAll(demo);
+  assert.equal(model.tables.cards!.cols.closed, 3, '"Closed On" is read as the closed date');
+  const a = model.rows.cards.find((r) => r.card === 'Card A')!;
+  const edit = editorFor(model, data, { kind: 'row', id: 'cards', key: a._key });
+  assert.deepEqual(edit.fields.map((x) => x.name), ['card', 'type', 'limit', 'closed']);
+  await execute(demo, edit.build({ card: 'Card A', type: 'Visa', limit: '10000', closed: '2026-11-12' }).plan);
+
+  ({ model, data } = await loadAll(demo));
+  let v = view(model);
+  assert.deepEqual(v.recs.map((r) => r.card), ['Card B', 'Card C', 'Card A'], 'closed card last');
+  assert.deepEqual(v.recs.map((r) => !!v.muted?.(r)), [false, false, true]);
+  assert.equal(v.total, 'AED 7,000', 'only open cards count');
+  assert.match(String(v.card(v.recs[2]).sub), /Closed 12 Nov 2026/);
+
+  // Reopen: empty the date
+  const closedA = model.rows.cards.find((r) => r.card === 'Card A')!;
+  const reopen = editorFor(model, data, { kind: 'row', id: 'cards', key: closedA._key }).build({ card: 'Card A', type: 'Visa', limit: '10000', closed: '' }).plan;
+  assert.deepEqual(reopen.changes.map((c) => [c.where, c.after]), [['Closed on', '—']]);
+  await execute(demo, reopen);
+  v = view((await loadAll(demo)).model);
+  assert.ok(v.recs.every((r) => !v.muted?.(r)));
+  assert.equal(v.total, 'AED 17,000');
 });
 
 withFixture('reordering bank accounts moves whole rows within their table, and nothing else', async () => {

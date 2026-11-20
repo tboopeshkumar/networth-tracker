@@ -32,6 +32,8 @@ export interface Field {
   aed?: boolean;
   /** an identifier such as a scheme code: shown without grouping or decimals */
   plain?: boolean;
+  /** emptying the field clears the cell (other fields left empty are simply unchanged) */
+  clearable?: boolean;
 }
 
 export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
@@ -177,6 +179,7 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
         text('card', 'Card', rec.card, { required: true }),
         text('type', 'Type', rec.type, { list: uniq(model.rows.cards.map((r) => r.type)) }),
         money('limit', 'Limit (AED)', rec.limit, { aed: true }),
+        ...(tbl.cols.closed !== undefined ? [date('closed', 'Closed on', rec.closed, { clearable: true, hint: 'Leave empty while the card is open; empty it to reopen one.' })] : []),
       ];
       break;
     case 'realEstate':
@@ -199,7 +202,13 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
       for (const f of fields) {
         const v = cellValue(f, vals[f.name]);
         const was = rec[f.name];
-        if (!v) continue;
+        if (!v) {
+          // An emptied clearable field (a card reopened) clears its cell
+          if (f.clearable && was !== '' && was !== null && was !== undefined) {
+            edits[f.name] = { value: V.clear(), display: '—', before: before(f, was), label: f.label };
+          }
+          continue;
+        }
         if ('number' in v && isNum(was) && Math.abs(v.number - was) < 0.005) continue;
         if ('string' in v && v.string === String(was ?? '').trim()) continue;
         edits[f.name] = { value: v, display: display(f, v), before: before(f, was), label: f.label };

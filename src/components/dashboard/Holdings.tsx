@@ -293,7 +293,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
           // With nothing else to show beside the sub line, Edit sits there instead of on a row of its own
           const inlineEdit = acts && !c.foot && !c.right;
           return (
-            <div className="flex gap-3 border-b border-grid py-2.5 last:border-0" key={r._key}>
+            <div className={cx('flex gap-3 border-b border-grid py-2.5 last:border-0', v.muted?.(r) && 'opacity-50')} key={r._key}>
               {c.icon && <div className="pt-0.5">{c.icon}</div>}
               <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-3">
@@ -330,7 +330,7 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
           </thead>
           <tbody>
             {recs.map((r: Row) => (
-              <tr key={r._key}>
+              <tr key={r._key} className={v.muted?.(r) ? 'opacity-50' : undefined}>
                 {v.columns.map((col) => (
                   <td key={col.head} className={[col.num && 'num', col.name && 'name', col.className?.(r)].filter(Boolean).join(' ') || undefined}>
                     {col.render(r)}

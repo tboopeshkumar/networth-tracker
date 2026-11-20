@@ -135,6 +135,9 @@ export const SPECS = {
   cards: spec({
     tab: 'Credit Cards', anchor: 'limit', key: ['card'], end: /^total/i, optional: true,
     headers: { card: 'Card', type: 'Type', limit: 'Limit (AED)' },
+    // A date there means the card was closed: it stays listed, greyed out, outside the total
+    optionalHeaders: { closed: 'Closed' },
+    aliases: { closed: /^closed/i },
   }),
   // Fractional property shares, valued in AED; the tab's total is what Net Worth reads
   realEstate: spec({
