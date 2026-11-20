@@ -56,3 +56,17 @@ withFixture('a real PDF comes out, with its text readable', async () => {
   assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
   assert.ok(bytes.length > 5_000, `size ${bytes.length}`);
 });
+
+withFixture('credit cards are left out of the report, masked or not', async () => {
+  const f = JSON.parse(readFileSync(FIX, 'utf8')) as Fixture;
+  const rows = [['Card', 'Type', 'Limit (AED)'], ['Example Unique Card', 'Visa Example', 12345]];
+  f.values['Credit Cards'] = rows;
+  f.formulas['Credit Cards'] = rows;
+  f.sheets.push({ title: 'Credit Cards', sheetId: 4243 });
+  const { model, data } = await loadAll(new DemoSheets(f));
+  assert.equal(model.rows.cards.length, 1, 'the app itself reads the card');
+  for (const mask of [true, false]) {
+    const text = allText(buildReport(model, data.values, { sheetTitle: 'Test', version: 'abc1234', mask }));
+    for (const s of ['Credit cards', 'Example Unique Card', 'Visa Example', '12,345']) assert.ok(!text.includes(s), `${s} (mask: ${mask})`);
+  }
+});

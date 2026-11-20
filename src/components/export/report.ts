@@ -104,7 +104,8 @@ export function buildReport(model: Model, values: Grids, opts: { sheetTitle: str
 
   // Every holdings section, expanded
   const views = buildViews(model);
-  for (const group of GROUP_ORDER) {
+  // Credit cards stay out of the report: they're reference only, and a list of cards and limits isn't for sharing
+  for (const group of GROUP_ORDER.filter((g) => g !== 'Credit cards')) {
     const vs = views.filter((v) => v.group === group);
     if (!vs.length) continue;
     const note = groupNote(model, group);
