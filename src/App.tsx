@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EditorDialog } from './components/EditorDialog';
 import { ExportDialog } from './components/export/ExportDialog';
 import { CasImportDialog } from './components/cas/CasImportDialog';
@@ -19,7 +19,17 @@ export function App() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const canEdit = s.identity?.canEdit ?? false;
-  const { stale: updateReady, checkNow } = useUpdateCheck();
+  const { stale: updateReady, live, checkNow } = useUpdateCheck();
+  // A newer version is live while you're still at the sign-in screen, where nothing is lost:
+  // reload into it now, so the session runs on the current version. Once per version, so it can't loop.
+  useEffect(() => {
+    if (!updateReady || !live || s.phase !== 'signin' || DEMO) return;
+    try {
+      if (sessionStorage.getItem('networth.updatedTo') === live) return;
+      sessionStorage.setItem('networth.updatedTo', live);
+    } catch { return; }
+    void reloadApp();
+  }, [updateReady, live, s.phase]);
 
   useIdleLock(s.phase === 'ready' && !DEMO, CONFIG.idleMinutes, () => {
     setEditing(null);

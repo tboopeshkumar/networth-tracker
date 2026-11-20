@@ -5,6 +5,7 @@ import type { Model } from '../../lib/model';
 import { V, planRowEdit, type Edit, type Plan } from '../../lib/writer';
 import { Saved } from '../Saved';
 import { AmcBadge, BTN, BTN_PRIMARY, PANEL, cx } from '../ui';
+import { OUTDATED, isOutdated } from '../../hooks/useUpdateCheck';
 import { PasswordNeeded, pdfText } from './pdfText';
 
 interface Props { model: Model; onWrite: (plan: Plan) => Promise<void>; onClose: () => void }
@@ -42,7 +43,7 @@ export function CasImportDialog({ model, onWrite, onClose }: Props) {
       setNeedPassword(false);
     } catch (e) {
       if (e instanceof PasswordNeeded) { setNeedPassword(true); setError(e.wrong ? e.message : null); }
-      else setError((e as Error).message);
+      else setError(isOutdated(e) ? OUTDATED : (e as Error).message);
     } finally {
       setBusy(false);
       setPassword('');

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Grids, Model } from '../../lib/model';
 import { VERSION } from '../../hooks/useUpdateCheck';
 import { BTN, BTN_PRIMARY } from '../ui';
+import { OUTDATED, isOutdated } from '../../hooks/useUpdateCheck';
 import { buildReport } from './report';
 
 interface Props { model: Model; values: Grids; sheetTitle: string; onClose: () => void }
@@ -40,7 +41,7 @@ export function ExportDialog({ model, values, sheetTitle, onClose }: Props) {
       ref.current?.close();
     } catch (e) {
       // Closing the share sheet without choosing counts as a cancel, not a failure
-      if ((e as Error).name !== 'AbortError') setError(`Couldn't create the PDF: ${(e as Error).message}`);
+      if ((e as Error).name !== 'AbortError') setError(isOutdated(e) ? OUTDATED : `Couldn't create the PDF: ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }

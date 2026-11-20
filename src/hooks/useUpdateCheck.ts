@@ -14,8 +14,9 @@ const AT_LEAST_MS = 20 * 1000;
  * the foreground or regains focus (a Home Screen app resumes rather than
  * reloads), and when asked to with `checkNow`. Production only.
  */
-export function useUpdateCheck(): { stale: boolean; checkNow: () => void } {
+export function useUpdateCheck(): { stale: boolean; live: string | null; checkNow: () => void } {
   const [stale, setStale] = useState(false);
+  const [live, setLive] = useState<string | null>(null);
   const last = useRef(0);
 
   const check = useCallback(async (gap: number) => {
@@ -26,8 +27,8 @@ export function useUpdateCheck(): { stale: boolean; checkNow: () => void } {
       // A query string and no-store get past GitHub Pages' 10-minute cache
       const res = await fetch(`${import.meta.env.BASE_URL}version.json?t=${last.current}`, { cache: 'no-store' });
       if (!res.ok) return;
-      const live = await res.json() as { version?: string };
-      if (live.version && live.version !== VERSION) setStale(true);
+      const { version } = await res.json() as { version?: string };
+      if (version && version !== VERSION) { setStale(true); setLive(version); }
     } catch { /* offline: try again next time */ }
   }, []);
 
@@ -44,7 +45,7 @@ export function useUpdateCheck(): { stale: boolean; checkNow: () => void } {
     };
   }, [check]);
 
-  return { stale, checkNow: useCallback(() => void check(AT_LEAST_MS), [check]) };
+  return { stale, live, checkNow: useCallback(() => void check(AT_LEAST_MS), [check]) };
 }
 
 /**
@@ -58,3 +59,12 @@ export async function reloadApp(): Promise<void> {
   } catch { /* offline: reload anyway */ }
   window.location.reload();
 }
+
+/**
+ * A part of the app loaded only when needed (the PDF export, the CAS reader)
+ * failed to load because a newer version went live since this page opened:
+ * each build names those files afresh and the old ones are gone.
+ */
+export const isOutdated = (e: unknown) =>
+  /dynamically imported module|importing a module script failed|error loading dynamically imported/i.test(String((e as Error)?.message ?? e));
+export const OUTDATED = 'The app was updated since you opened it. Tap Reload (↻) in the header, then try again.';
