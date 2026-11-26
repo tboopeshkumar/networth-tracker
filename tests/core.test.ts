@@ -12,7 +12,7 @@ import { test } from 'vitest';
 
 import { accessFor } from '../src/lib/access';
 import { DemoSheets, shiftRows, type Fixture } from '../src/lib/demoSheets';
-import { n0, type Cell } from '../src/lib/format';
+import { isNum, n0, type Cell } from '../src/lib/format';
 import { JEWELLERY_TAB, readJewellery } from '../src/lib/jewellery';
 import { editorFor } from '../src/lib/editors';
 import { feedRateFor, readRatesFeed } from '../src/lib/ratesFeed';
@@ -500,6 +500,42 @@ withFixture('a closed card is greyed, listed last, left out of the total, and ca
   v = view((await loadAll(demo)).model);
   assert.ok(v.recs.every((r) => !v.muted?.(r)));
   assert.equal(v.total, 'AED 17,000');
+});
+
+withFixture('bank accounts can be closed and reopened, each table finding its own Closed column', async () => {
+  const f = fixture();
+  const m0 = buildModel(f.values, f.formulas);
+  const tab = m0.tables.bankAed.spec.tab;
+  const inrHead = m0.tables.bankInr.headerRow;
+  const head = (g: Cell[][]) => { const row = g[inrHead]; while (row.length < 8) row.push(''); return row; };
+  // Closed beside each table: the free column after the INR table, and the one after the AED table
+  const inrAt = m0.tables.bankInr.maxCol + 1;
+  const aedAt = m0.tables.bankAed.maxCol + 1;
+  for (const g of [f.values[tab], f.formulas[tab]]) { head(g)[inrAt] = 'Closed'; head(g)[aedAt] = 'Closed On'; }
+  const demo = new DemoSheets(f);
+
+  let { model, data } = await loadAll(demo);
+  assert.equal(model.tables.bankInr.cols.closed, inrAt);
+  assert.equal(model.tables.bankAed.cols.closed, aedAt, 'the nearer one, though the other comes first');
+  const acct = model.rows.bankAed.find((r) => isNum(r.balance) && r.balance > 0)!;
+  const edit = editorFor(model, data, { kind: 'row', id: 'bankAed', key: acct._key });
+  assert.ok(edit.fields.some((x) => x.name === 'closed'));
+  const { plan, warn } = edit.build({ account: String(acct.account), holder: String(acct.holder), balance: String(acct.balance), closed: '2026-11-20' });
+  assert.match(warn.join(' '), /still shows a balance/);
+  await execute(demo, plan);
+
+  ({ model, data } = await loadAll(demo));
+  const v = buildViews(model).find((x) => x.id === 'bankAed')!;
+  assert.equal(v.recs.at(-1)!._key, acct._key, 'closed account last');
+  assert.ok(v.muted?.(v.recs.at(-1)!));
+  assert.match(String(v.card(v.recs.at(-1)!).sub), /Closed 20 Nov 2026/);
+  assert.equal(buildViews(model).find((x) => x.id === 'bankInr')!.recs.some((r) => v.muted?.(r)), false, 'INR accounts untouched');
+
+  const reopened = model.rows.bankAed.find((r) => r._key === acct._key)!;
+  await execute(demo, editorFor(model, data, { kind: 'row', id: 'bankAed', key: reopened._key })
+    .build({ account: String(acct.account), holder: String(acct.holder), balance: String(acct.balance), closed: '' }).plan);
+  const after = buildViews((await loadAll(demo)).model).find((x) => x.id === 'bankAed')!;
+  assert.ok(after.recs.every((r) => !after.muted?.(r)));
 });
 
 withFixture('reordering bank accounts moves whole rows within their table, and nothing else', async () => {

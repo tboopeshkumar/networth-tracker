@@ -281,6 +281,10 @@ In the app, open *Rates & other inputs* → **AED → INR** → *Live rate from 
 
 The app then shows each rate's date, and *Worth a look* flags the feed if it hasn't refreshed for three days. A failed fetch keeps the previous value.
 
+### Closed bank accounts
+
+Add a **Closed** header beside each bank table on Bank Balances, in the header row: in the free column right after *Balance (INR)*, and in the column right after *Balance (AED)*. An account with a date there is shown greyed out at the end of its list, with its closed date; Edit → Closed on sets the date, and emptying it reopens the account. Its balance still counts, as it does in the sheet, so set it to 0 once the money has moved out.
+
 ### Credit cards
 
 A `Credit Cards` tab headed **Card | Type | Limit (AED)**, one row per card, shows under Holdings → Credit cards, with add, edit and delete. Limits are for reference: they're part of no total and don't change your net worth. An optional **Closed** column takes the date a card was closed: it's then shown greyed out at the end of the list and left out of the total limit; emptying the date (Edit → Closed on) reopens it. Card bills you owe belong in the Dues tables.

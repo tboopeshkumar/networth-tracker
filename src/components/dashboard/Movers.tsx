@@ -4,7 +4,7 @@ import { changesSince, isPending, type Changes, type LineChange } from '../../li
 import { fmtDay, join, num, signedPct, todaySerial } from '../../lib/format';
 import type { ViewId } from '../../lib/links';
 import type { Model, NetWorthRow } from '../../lib/model';
-import { Amount, CATEGORY_SLOT, Card, Label, PANEL, Pill, Swatch, cx } from '../ui';
+import { Amount, CATEGORY_SLOT, Card, FoldCard, Label, PANEL, Pill, Swatch, cx } from '../ui';
 
 interface Props {
   model: Model;
@@ -32,18 +32,19 @@ export function Movers({ model, linkOf, onDrill }: Props) {
   if (c === null) return null;
   if (isPending(c)) {
     return (
-      <Card title="What changed" sub="Since the last daily record">
+      <FoldCard title="What changed" summary={`From ${fmtDay(c.pending)}, what moved since the day before`}>
         <p className="text-[13px] text-ink-2">The first daily record was taken today. From {fmtDay(c.pending)}, this shows what moved since the day before.</p>
-      </Card>
+      </FoldCard>
     );
   }
 
   const when = c.since === todaySerial() - 1 ? `yesterday (${fmtDay(c.since)})` : fmtDay(c.since);
   return (
-    <Card title="What changed" sub={`Since ${when}, the last daily record`}>
+    // Closed by default: the net worth move since the last record; tap for the lines behind it
+    <FoldCard title="What changed" summary={<>Since {when}: <b className="font-semibold text-ink"><Delta value={c.current} /></b> net worth</>}>
       {/* The list runs to the card's bottom edge, like All positions */}
       <ChangeBody changes={c} linkOf={linkOf} onDrill={onDrill} listClass="-mb-4 overflow-hidden rounded-b-xl sm:-mb-5" />
-    </Card>
+    </FoldCard>
   );
 }
 

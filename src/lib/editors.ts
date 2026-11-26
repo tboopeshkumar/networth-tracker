@@ -119,6 +119,12 @@ function navFed(model: Model, data: SheetData, rec: Row): boolean {
   return t.cols.units !== undefined && isFormula(data.formulas[t.spec.tab]?.[rec._row]?.[t.cols.current]);
 }
 
+/** "Closed on", where the table has a Closed column: empty while open, emptied to reopen. */
+function closedField(tbl: { cols: Record<string, number> }, rec: Row, what: 'card' | 'account'): Field[] {
+  if (tbl.cols.closed === undefined) return [];
+  return [date('closed', 'Closed on', rec.closed, { clearable: true, hint: `Leave empty while the ${what} is open; empty it to reopen one.` })];
+}
+
 function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | undefined): EditorDef {
   const tbl = model.tables[id];
   if (!rec || !tbl) throw new Error('That row is no longer in the sheet. Refresh and try again.');
@@ -167,11 +173,11 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
       break;
     case 'bankInr':
       name = `${rec.account} · ${rec.holder}`;
-      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder', rec.holder), money('balance', 'Balance (₹)', rec.balance)];
+      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder', rec.holder), money('balance', 'Balance (₹)', rec.balance), ...closedField(tbl, rec, 'account')];
       break;
     case 'bankAed':
       name = `${rec.account} · ${rec.holder}`;
-      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder / notes', rec.holder), money('balance', 'Balance (AED)', rec.balance, { aed: true })];
+      fields = [text('account', 'Account', rec.account, { required: true }), text('holder', 'Holder / notes', rec.holder), money('balance', 'Balance (AED)', rec.balance, { aed: true }), ...closedField(tbl, rec, 'account')];
       break;
     case 'cards':
       name = String(rec.card);
@@ -179,7 +185,7 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
         text('card', 'Card', rec.card, { required: true }),
         text('type', 'Type', rec.type, { list: uniq(model.rows.cards.map((r) => r.type)) }),
         money('limit', 'Limit (AED)', rec.limit, { aed: true }),
-        ...(tbl.cols.closed !== undefined ? [date('closed', 'Closed on', rec.closed, { clearable: true, hint: 'Leave empty while the card is open; empty it to reopen one.' })] : []),
+        ...closedField(tbl, rec, 'card'),
       ];
       break;
     case 'realEstate':
@@ -216,6 +222,13 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
         if (isFormula(fx)) warn.push(`${f.label} is currently a formula (${fx}); this replaces it with a fixed value.`);
       }
       if (!Object.keys(edits).length) throw new Error('Nothing changed.');
+      // A bank account closed with money still in it: that balance keeps counting in the sheet's totals
+      if ((id === 'bankInr' || id === 'bankAed') && edits.closed && !('clear' in edits.closed.value)) {
+        const balance = edits.balance && 'number' in edits.balance.value ? edits.balance.value.number : rec.balance;
+        if (isNum(balance) && Math.abs(balance) >= 1) {
+          warn.push(`This account still shows a balance of ${id === 'bankAed' ? `AED ${num(balance)}` : inr(balance)}, which keeps counting in your totals. Set it to 0 if the money has moved out.`);
+        }
+      }
       return { plan: planRowEdit(model, id, rec, edits, title), warn };
     },
   };

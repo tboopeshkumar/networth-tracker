@@ -95,11 +95,16 @@ export const SPECS = {
     sideBySide: true,
     tab: 'Bank Balances', anchor: 'balance', key: ['account', 'holder'], end: /total/i,
     headers: { account: 'Account', holder: 'Holder', balance: 'Balance (INR)' },
+    // A date there means the account was closed: still listed, greyed out, at the end
+    optionalHeaders: { closed: 'Closed' },
+    aliases: { closed: /^closed/i },
   }),
   bankAed: spec({
     sideBySide: true,
     tab: 'Bank Balances', anchor: 'balance', key: ['account', 'holder'], end: /total/i,
     headers: { account: 'Account', holder: 'Holder/Notes', balance: 'Balance (AED)' },
+    optionalHeaders: { closed: 'Closed' },
+    aliases: { closed: /^closed/i },
   }),
   goldUae: spec({
     tab: 'Gold (UAE)', anchor: 'perUnit', key: ['date', 'source', 'cost'], end: null,
@@ -317,10 +322,14 @@ export function locateTable(grid: Grid, s: Spec): Table {
       const c = nearest(norm(h));
       if (c >= 0) cols[field] = c;
     }
+    // A header worded another way counts too; of all the matches, exact or not, the one
+    // nearest this table's anchor wins, since a table beside it may have its own
     for (const [field, re] of Object.entries(s.aliases ?? {})) {
-      if (cols[field] !== undefined) continue;
-      const taken = new Set(Object.values(cols));
-      const c = row.findIndex((v, i) => typeof v === 'string' && re.test(v) && !taken.has(i));
+      const taken = new Set(Object.entries(cols).filter(([f]) => f !== field).map(([, c]) => c));
+      let c = cols[field] ?? -1;
+      row.forEach((v, i) => {
+        if (typeof v === 'string' && re.test(v.trim()) && !taken.has(i) && (c < 0 || Math.abs(i - anchorCol) < Math.abs(c - anchorCol))) c = i;
+      });
       if (c >= 0) cols[field] = c;
     }
 

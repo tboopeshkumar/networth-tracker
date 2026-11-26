@@ -197,8 +197,10 @@ export function buildViews(model: Model): View[] {
     }),
     ...realEstateView(model),
     ...cardsView(model),
-    view<RowOf<'bankInr'>>({
-      id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: R.bankInr, total: <Amount value={sum(R.bankInr, 'balance')} />,
+    ((b) => view<RowOf<'bankInr'>>({
+      id: 'bankInr', group: 'Cash', name: 'Bank · INR', recs: b.ordered, total: <Amount value={sum(R.bankInr, 'balance')} />,
+      // Closed accounts greyed out, after the open ones; their balance still counts, as in the sheet
+      muted: b.closed,
       edit: editRow('bankInr'),
       add: { kind: 'add', id: 'bankInr' },
       holders: byHolder('balance'),
@@ -208,11 +210,14 @@ export function buildViews(model: Model): View[] {
         { head: 'Account', name: true, render: (r) => text(r.account) },
         { head: 'Holder', render: (r) => text(r.holder) },
         { head: 'Balance (INR)', num: true, render: (r) => inr(r.balance), className: () => 'strong' },
+        ...(model.tables.bankInr.cols.closed !== undefined ? [{ head: 'Closed', render: (r: RowOf<'bankInr'>) => (b.closed(r) ? b.when(r) : '—') }] : []),
       ],
-      card: (r) => ({ title: text(r.account), value: inr(r.balance), sub: text(r.holder) }),
-    }),
-    view<RowOf<'bankAed'>>({
-      id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: R.bankAed, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
+      card: (r) => ({ title: text(r.account), value: inr(r.balance), sub: b.closed(r) ? `${text(r.holder)} · Closed ${b.when(r)}` : text(r.holder) }),
+    }))(withClosed(R.bankInr as (RowOf<'bankInr'> & { closed?: Cell })[])),
+    ((b) => view<RowOf<'bankAed'>>({
+      id: 'bankAed', group: 'Cash', name: 'Bank · AED', recs: b.ordered, total: `AED ${num(sum(R.bankAed, 'balance'), 0)}`,
+      // Closed accounts greyed out, after the open ones; their balance still counts, as in the sheet
+      muted: b.closed,
       edit: editRow('bankAed'),
       add: { kind: 'add', id: 'bankAed' },
       holders: byHolder('balance', (n) => `AED ${num(n, 0)}`),
@@ -222,9 +227,10 @@ export function buildViews(model: Model): View[] {
         { head: 'Account', name: true, render: (r) => text(r.account) },
         { head: 'Holder', render: (r) => text(r.holder) },
         { head: 'Balance (AED)', num: true, render: (r) => `AED ${num(r.balance, 0)}`, className: () => 'strong' },
+        ...(model.tables.bankAed.cols.closed !== undefined ? [{ head: 'Closed', render: (r: RowOf<'bankAed'>) => (b.closed(r) ? b.when(r) : '—') }] : []),
       ],
-      card: (r) => ({ title: text(r.account), value: `AED ${num(r.balance, 0)}`, sub: text(r.holder) }),
-    }),
+      card: (r) => ({ title: text(r.account), value: `AED ${num(r.balance, 0)}`, sub: b.closed(r) ? `${text(r.holder)} · Closed ${b.when(r)}` : text(r.holder) }),
+    }))(withClosed(R.bankAed as (RowOf<'bankAed'> & { closed?: Cell })[])),
     ...duesView(model, 'duesInr'),
     ...duesView(model, 'duesAed'),
     ...(['goldUae', 'silverUae'] as const).map((id) => {
@@ -319,17 +325,22 @@ export function buildViews(model: Model): View[] {
   return views;
 }
 
+/**
+ * Rows that may carry a Closed date (credit cards, bank accounts): open ones
+ * first, closed ones after, each in the sheet's order; and the date, with its year.
+ */
+function withClosed<R extends Row>(rows: R[]) {
+  const closed = (r: R) => r.closed !== undefined && r.closed !== '' && r.closed !== null;
+  const when = (r: R) => (isNum(r.closed) ? fmtDate(r.closed) : text(r.closed));
+  return { closed, ordered: [...rows.filter((r) => !closed(r)), ...rows.filter(closed)], when };
+}
+
 /** Credit cards and their limits: reference only, so the section adds to no total. */
 function cardsView(model: Model): View[] {
   if (!model.tables.cards) return [];
   type CardRow = RowOf<'cards'> & { closed?: Cell };
-  const closed = (r: CardRow) => r.closed !== undefined && r.closed !== '' && r.closed !== null;
-  // Open cards first, closed ones after, each in the sheet's order
-  const all = model.rows.cards as CardRow[];
-  const recs = [...all.filter((r) => !closed(r)), ...all.filter(closed)];
+  const { closed, ordered: recs, when } = withClosed(model.rows.cards as CardRow[]);
   const aed = (n: unknown) => (isNum(n) ? `AED ${num(n, 0)}` : '—');
-  // With the year: a closed card can be from any year
-  const when = (r: CardRow) => (isNum(r.closed) ? fmtDate(r.closed) : text(r.closed));
   const hasClosed = model.tables.cards.cols.closed !== undefined;
   return [view<CardRow>({
     id: 'cards', group: 'Credit cards', name: 'Cards', recs,
