@@ -561,7 +561,9 @@ withFixture('bank accounts can be closed and reopened, each table finding its ow
   assert.ok(edit.fields.some((x) => x.name === 'closed'));
   const { plan, warn } = edit.build({ account: String(acct.account), holder: String(acct.holder), balance: String(acct.balance), closed: '2026-11-20' });
   assert.match(warn.join(' '), /still shows a balance/);
-  await execute(demo, plan);
+  const { requests } = await execute(demo, plan);
+  const dateCell = requests.find((r) => 'updateCells' in r && r.updateCells.start.columnIndex === aedAt);
+  assert.ok(dateCell && 'updateCells' in dateCell && dateCell.updateCells.fields.includes('numberFormat'), 'written with a date format, not as a bare number');
 
   ({ model, data } = await loadAll(demo));
   const v = buildViews(model).find((x) => x.id === 'bankAed')!;

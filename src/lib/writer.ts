@@ -399,7 +399,11 @@ export function planRemove(model: Model, id: TableId, rec: Row, title: string): 
   };
 }
 
-export interface Edit { value: CellValue; display: string; before?: string; label?: string }
+export interface Edit {
+  value: CellValue; display: string; before?: string; label?: string;
+  /** also give the cell a date format: a column the app added dates to, which has none of its own */
+  date?: boolean;
+}
 
 /** Update fields of an existing table row. */
 export function planRowEdit(model: Model, id: TableId, rec: Row, edits: Record<string, Edit>, title: string): Plan {
@@ -419,6 +423,7 @@ export function planRowEdit(model: Model, id: TableId, rec: Row, edits: Record<s
       target: { kind: 'row' as const, id, key: rec._key, field },
       expect: rec[field],
       value: e.value,
+      ...(e.date ? { date: true } : {}),
     })),
   };
 }

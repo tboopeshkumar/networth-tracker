@@ -34,6 +34,8 @@ export interface Field {
   plain?: boolean;
   /** emptying the field clears the cell (other fields left empty are simply unchanged) */
   clearable?: boolean;
+  /** written with a date format, for a column the sheet has no format on yet (Closed) */
+  formatDate?: boolean;
 }
 
 export type EditableRow = 'mf' | 'equity' | 'sgb' | 'fd' | 'bankInr' | 'bankAed' | 'nps' | 'duesInr' | 'duesAed' | 'realEstate' | 'cards';
@@ -122,7 +124,7 @@ function navFed(model: Model, data: SheetData, rec: Row): boolean {
 /** "Closed on", where the table has a Closed column: empty while open, emptied to reopen. */
 function closedField(tbl: { cols: Record<string, number> }, rec: Row, what: 'card' | 'account'): Field[] {
   if (tbl.cols.closed === undefined) return [];
-  return [date('closed', 'Closed on', rec.closed, { clearable: true, hint: `Leave empty while the ${what} is open; empty it to reopen one.` })];
+  return [date('closed', 'Closed on', rec.closed, { clearable: true, formatDate: true, hint: `Leave empty while the ${what} is open; empty it to reopen one.` })];
 }
 
 function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | undefined): EditorDef {
@@ -217,7 +219,7 @@ function rowEditor(model: Model, data: SheetData, id: EditableRow, rec: Row | un
         }
         if ('number' in v && isNum(was) && Math.abs(v.number - was) < 0.005) continue;
         if ('string' in v && v.string === String(was ?? '').trim()) continue;
-        edits[f.name] = { value: v, display: display(f, v), before: before(f, was), label: f.label };
+        edits[f.name] = { value: v, display: display(f, v), before: before(f, was), label: f.label, ...(f.formatDate ? { date: true } : {}) };
         const fx = data.formulas[tbl.spec.tab]?.[rec._row]?.[tbl.cols[f.name]];
         if (isFormula(fx)) warn.push(`${f.label} is currently a formula (${fx}); this replaces it with a fixed value.`);
       }
