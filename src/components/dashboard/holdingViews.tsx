@@ -53,6 +53,8 @@ export interface View<R extends Row = Row> {
   muted?: (r: R) => boolean;
   /** a line above the rows, for figures that belong to the section rather than a row */
   lead?: ReactNode;
+  /** an Edit on that line, for a figure kept outside the rows (NPS contributions) */
+  leadEdit?: EditRequest;
   /** rows can be narrowed to one holder: whose a row is, and what a narrowed list adds up to */
   holders?: { of: (r: R) => string; total: (rows: R[]) => ReactNode };
   /** rows can be put in a chosen order, kept in the sheet */
@@ -445,6 +447,8 @@ function npsView(model: Model): View[] {
     id: 'nps', group: 'Investments', name: 'NPS', recs, inr: value, total: <Amount value={value} />,
     note: oldest(recs.map((r) => r.navDate)),
     edit: editRow('nps'),
+    // What's been paid in is the one NPS figure typed in by hand: edited here, on its own line
+    leadEdit: model.cells.npsInvested ? { kind: 'cell', path: 'cells.npsInvested' } : undefined,
     lead: isNum(invested) && (
       <div className={cx(PANEL, 'mb-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2 text-[13px]')}>
         <span>Contributed <b className="font-semibold tabular-nums"><Amount value={invested} /></b></span>

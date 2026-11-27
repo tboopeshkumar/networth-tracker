@@ -9,6 +9,7 @@ import { PickScreen } from '../src/components/Screens';
 import { ToastCard } from '../src/components/Toast';
 import { Holdings } from '../src/components/dashboard/Holdings';
 import { Positions } from '../src/components/dashboard/Positions';
+import { RatesInputs } from '../src/components/dashboard/RatesInputs';
 import { buildViews, holdersIn, rowsFor } from '../src/components/dashboard/holdingViews';
 import { Summary } from '../src/components/dashboard/Summary';
 import { DemoSheets, type Fixture } from '../src/lib/demoSheets';
@@ -110,4 +111,21 @@ test('table defaults sit in a layer, so emphasis on a cell (up, down, strong) ca
   const css = readFileSync(new URL('../src/styles/app.css', import.meta.url), 'utf8');
   const layer = css.indexOf('@layer components {');
   assert.ok(layer >= 0 && layer < css.indexOf('.tbl td {'), '.tbl rules are inside @layer components');
+});
+
+test('with NPS scheme holdings, contributions are edited in the NPS section, not among the inputs', async () => {
+  if (!existsSync(FIX)) return;
+  const f = JSON.parse(readFileSync(FIX, 'utf8')) as Fixture;
+  const start = f.values.NPS.length + 2;
+  [['Scheme ID', 'Scheme', 'Units', 'NAV', 'Value', 'NAV date'], ['SM000001', 'Example Scheme C', 100, 10, 1000, 46288]]
+    .forEach((r, i) => { f.values.NPS[start + i] = r; f.formulas.NPS[start + i] = r; });
+  const { model } = await loadAll(new DemoSheets(f));
+  if (!model.cells.npsInvested) return;
+  const inputs = renderToStaticMarkup(<RatesInputs model={model} canEdit onEdit={() => {}} />);
+  assert.ok(!inputs.includes('NPS contributions') && !inputs.includes('NPS gain'));
+  const nps = buildViews(model).find((v) => v.id === 'nps')!;
+  assert.deepEqual(nps.leadEdit, { kind: 'cell', path: 'cells.npsInvested' });
+  // Without the scheme table, the tiles stay: there's nowhere else to edit them
+  const plain = (await loadAll(new DemoSheets(JSON.parse(readFileSync(FIX, 'utf8')) as Fixture))).model;
+  assert.ok(renderToStaticMarkup(<RatesInputs model={plain} canEdit onEdit={() => {}} />).includes('NPS contributions'));
 });

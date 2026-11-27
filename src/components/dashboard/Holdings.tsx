@@ -264,7 +264,9 @@ function Section({ view: v, canEdit, onEdit }: { view: View; canEdit: boolean; o
   return (
     <>
       {v.ledger && <LedgerSummary ledger={v.ledger} canEdit={canEdit} onEdit={onEdit} />}
-      {v.lead}
+      {v.lead && v.leadEdit && canEdit
+        ? <div className="flex items-start gap-1"><div className="min-w-0 flex-1">{v.lead}</div><span className="pt-1"><EditButton request={v.leadEdit} onEdit={onEdit} /></span></div>
+        : v.lead}
       {names.length > 1 && v.holders && (
         <div className="mb-1 flex flex-wrap items-center gap-1.5 pt-1" role="group" aria-label="Filter by holder">
           {[null, ...names].map((h) => (

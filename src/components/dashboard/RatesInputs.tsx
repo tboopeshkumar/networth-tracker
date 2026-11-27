@@ -22,9 +22,11 @@ export function RatesInputs({ model, canEdit, onEdit }: { model: Model; canEdit:
     const src = /GOOGLEFINANCE/i.test(f ?? '') ? { note: 'Live · pegged at 3.6725', live: true } : f ? { note: 'Formula' } : { note: 'Typed in' };
     tiles.push({ label: 'USD → AED', value: num(C.fxUsdAed.value, 4), ...src, path: 'cells.fxUsdAed' });
   }
-  if (C.npsInvested) tiles.push({ label: 'NPS contributions', value: inr(C.npsInvested.value), note: `As of ${fmtDate(C.npsAsOf?.value)}`, path: 'cells.npsInvested' });
+  // With scheme holdings, NPS has its own section: its contributions are edited there, and its gain shown there
+  const npsSection = model.rows.nps.length > 0;
+  if (C.npsInvested && !npsSection) tiles.push({ label: 'NPS contributions', value: inr(C.npsInvested.value), note: `As of ${fmtDate(C.npsAsOf?.value)}`, path: 'cells.npsInvested' });
   // Priced from scheme NAVs, the gain is a formula: show where it comes from, and don't offer to overwrite it
-  if (C.npsGain) {
+  if (C.npsGain && !npsSection) {
     tiles.push(C.npsGain.formula
       ? { label: 'NPS gain', value: inr(C.npsGain.value), note: `From NAVs · ${fmtDay(C.npsAsOf?.value)}`, live: true, path: 'cells.npsGain', readOnly: true }
       : { label: 'NPS gain', value: inr(C.npsGain.value), note: 'Unrealised', path: 'cells.npsGain' });
