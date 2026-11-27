@@ -502,6 +502,21 @@ withFixture('a closed card is greyed, listed last, left out of the total, and ca
   assert.equal(v.total, 'AED 17,000');
 });
 
+withFixture('a Closed column beside one bank table is never claimed by the table beside it', async () => {
+  for (const which of ['bankAed', 'bankInr'] as const) {
+    const f = fixture();
+    const m0 = buildModel(f.values, f.formulas);
+    const tab = m0.tables.bankAed.spec.tab;
+    const at = m0.tables[which].maxCol + 1;
+    for (const g of [f.values[tab], f.formulas[tab]]) { const row = g[m0.tables.bankInr.headerRow]; while (row.length <= at) row.push(''); row[at] = 'Closed'; }
+    const m = buildModel(f.values, f.formulas);
+    const other = which === 'bankAed' ? 'bankInr' : 'bankAed';
+    assert.equal(m.tables[which].cols.closed, at, `${which} has its Closed column`);
+    assert.equal(m.tables[other].cols.closed, undefined, `${other} doesn't take it`);
+    assert.equal(m.tables[other].maxCol, m0.tables[other].maxCol, `${other} keeps its own columns`);
+  }
+});
+
 withFixture('a new card goes after the last open card, ahead of closed ones, with no closed date', async () => {
   const f = fixture();
   const tab = 'Credit Cards';

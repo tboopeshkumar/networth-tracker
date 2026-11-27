@@ -318,9 +318,15 @@ export function locateTable(grid: Grid, s: Spec): Table {
       cols[field] = c;
     }
     if (!ok) continue;
+    // A table sharing its rows with another (the bank tables) owns only extra columns to the right
+    // of its own, up to the first blank header: one beyond belongs to the table beside it
+    const lo = Math.min(...Object.values(cols));
+    let hi = Math.max(...Object.values(cols));
+    while (hi + 1 < row.length && !blank(row[hi + 1])) hi++;
+    const own = (c: number) => !s.sideBySide || (c >= lo && c <= hi);
     for (const [field, h] of Object.entries(s.optionalHeaders ?? {})) {
       const c = nearest(norm(h));
-      if (c >= 0) cols[field] = c;
+      if (c >= 0 && own(c)) cols[field] = c;
     }
     // A header worded another way counts too; of all the matches, exact or not, the one
     // nearest this table's anchor wins, since a table beside it may have its own
@@ -328,7 +334,7 @@ export function locateTable(grid: Grid, s: Spec): Table {
       const taken = new Set(Object.entries(cols).filter(([f]) => f !== field).map(([, c]) => c));
       let c = cols[field] ?? -1;
       row.forEach((v, i) => {
-        if (typeof v === 'string' && re.test(v.trim()) && !taken.has(i) && (c < 0 || Math.abs(i - anchorCol) < Math.abs(c - anchorCol))) c = i;
+        if (typeof v === 'string' && re.test(v.trim()) && !taken.has(i) && own(i) && (c < 0 || Math.abs(i - anchorCol) < Math.abs(c - anchorCol))) c = i;
       });
       if (c >= 0) cols[field] = c;
     }
