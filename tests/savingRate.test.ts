@@ -61,3 +61,21 @@ withFixture('without an Income tab there is no card', () => {
   delete f.values[INCOME_TAB];
   assert.equal(savingByMonth(buildModel(f.values, f.formulas)), null);
 });
+
+test('the Year | Month | Type | Description | Amount layout, with TOTAL in any column', () => {
+  const head = ['Year', 'Month', 'Type', 'Description', 'Amount (AED)'];
+  const rows: (string | number)[][] = [
+    ['Monthly Income (AED)'],
+    ['Income log — add new entries above the TOTAL row. Type: Salary / Bonus / Other'],
+    [],
+    head,
+    [2026, 'Feb', 'Salary', '', 1000],
+    [2026, 'Mar', 'Salary', '', 1000],
+    [2026, 'Mar', 'Bonus', 'Annual bonus', 500],
+    [2026, 'Apr', 'Other', 'Total settlement from old job', 50], // a month's own row, though it says total
+  ];
+  for (const [label, total] of [['TOTAL in Year', ['TOTAL', '', '', '', 2550]], ['TOTAL in Description', ['', '', '', 'TOTAL (all periods)', 2550]], ['TOTAL in Month', ['', 'TOTAL', '', '', 2550]]] as const) {
+    const income = readIncome([...rows, [...total], [2027, 'Jan', 'Salary', '', 999]]);
+    assert.deepEqual([...income], [['2026-02', 1000], ['2026-03', 1500], ['2026-04', 50]], label);
+  }
+});

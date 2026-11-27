@@ -1,8 +1,9 @@
 // The "Income" tab: monthly income in AED, one row per payment, headed
 //   Year | Month / Note | Amount (AED)
-// Bonuses and the like are their own rows ("Mar - Bonus"); a row whose label
-// names no month ("Joining Bonus") belongs to the month of the row above. A
-// blank Year carries on from the row above. The list ends at its TOTAL row.
+// Bonuses and the like are their own rows ("Mar - Bonus", or Mar with a Type
+// of Bonus); a row whose label names no month ("Joining Bonus") belongs to the
+// month of the row above. A blank Year carries on from the row above. Other
+// columns (Type, Description) are ignored. The list ends at its TOTAL row.
 
 import { isNum } from './format';
 import type { Grid } from './model';
@@ -26,10 +27,12 @@ export function readIncome(grid: Grid | undefined): Map<string, number> {
   let month: number | null = null;
   for (const r of grid.slice(head + 1)) {
     const label = norm(r?.[labelCol]);
-    if (/^total/.test(label)) break;
+    const m = MONTHS.indexOf(label.slice(0, 3));
+    // The TOTAL row ends the list, whichever column says TOTAL; a month's own row
+    // ("Total settlement" as its description) is not it
+    if (m < 0 && (r ?? []).some((v) => /^total\b/.test(norm(v)))) break;
     const y = Number(String(r?.[yearCol] ?? '').trim());
     if (Number.isInteger(y) && y > 1900) year = y;
-    const m = MONTHS.indexOf(label.slice(0, 3));
     if (m >= 0) month = m + 1;
     const amount = r?.[amountCol];
     if (year === null || month === null || !isNum(amount)) continue;
