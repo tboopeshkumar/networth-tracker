@@ -388,11 +388,21 @@ function addEditor(model: Model, data: SheetData, id: AddableId | LedgerId): Edi
     }
     return { cells, shown };
   };
+  /**
+   * In a table that marks rows closed (cards, bank accounts), a new row goes after the last
+   * open one, ahead of the closed ones: it's made by copying the row above, which must not be closed.
+   */
+  const afterOpen = (tableId: SpecId): string | undefined => {
+    const rows = model.rows[tableId as 'cards'] as Row[];
+    const isClosed = (r: Row) => r.closed !== undefined && r.closed !== '' && r.closed !== null;
+    const lastOpen = rows.filter((r) => !isClosed(r)).at(-1);
+    return lastOpen && rows.slice(rows.indexOf(lastOpen) + 1).some(isClosed) ? lastOpen._key : undefined;
+  };
   const simple = (tableId: SpecId, title: string, fields: Field[], hint?: string): EditorDef => ({
     title, hint, fields,
     build(vals) {
       const { cells, shown } = collect(fields, vals);
-      return { plan: planInsert(model, tableId, cells, shown, title), warn: [] };
+      return { plan: planInsert(model, tableId, cells, shown, title, {}, afterOpen(tableId)), warn: [] };
     },
   });
 
@@ -448,7 +458,7 @@ function addEditor(model: Model, data: SheetData, id: AddableId | LedgerId): Edi
         text('account', 'Account', '', { required: true }),
         text('holder', aed ? 'Holder / notes' : 'Holder', '', { list: uniq(rows.map((r) => r.holder)) }),
         money('balance', aed ? 'Balance (AED)' : 'Balance (₹)', '', { required: true, aed }),
-      ], 'Added at the end of the list, in this table only; the table beside it and everything below stay where they are.');
+      ], 'Added after your open accounts, in this table only; the table beside it and everything below stay where they are.');
     }
     case 'duesInr':
     case 'duesAed': {
@@ -476,7 +486,7 @@ function addEditor(model: Model, data: SheetData, id: AddableId | LedgerId): Edi
         text('card', 'Card', '', { required: true }),
         text('type', 'Type', '', { list: uniq(model.rows.cards.map((r) => r.type)) }),
         money('limit', 'Limit (AED)', '', { required: true, aed: true }),
-      ], 'Added at the end of the list.');
+      ], 'Added after your open cards, ahead of any closed ones.');
     case 'realEstate': {
       const rows = model.rows.realEstate;
       const tbl = model.tables.realEstate;

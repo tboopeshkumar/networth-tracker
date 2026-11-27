@@ -502,6 +502,30 @@ withFixture('a closed card is greyed, listed last, left out of the total, and ca
   assert.equal(v.total, 'AED 17,000');
 });
 
+withFixture('a new card goes after the last open card, ahead of closed ones, with no closed date', async () => {
+  const f = fixture();
+  const tab = 'Credit Cards';
+  const grid: Cell[][] = [['Card', 'Type', 'Limit (AED)', 'Closed'], ['Open A', 'Visa', 1000, ''], ['Open B', 'Visa', 2000, ''], ['Closed C', 'Visa', 3000, 46331], ['Closed D', 'Visa', 4000, 46300]];
+  f.values[tab] = grid.map((r) => [...r]);
+  f.formulas[tab] = grid.map((r) => [...r]);
+  f.sheets.push({ title: tab, sheetId: 4245 });
+  const demo = new DemoSheets(f);
+  const { model, data } = await loadAll(demo);
+  const add = editorFor(model, data, { kind: 'add', id: 'cards' });
+  const { plan } = add.build({ card: 'New E', type: 'Visa', limit: '500' });
+  assert.equal(plan.changes[0].a1, "'Credit Cards'!A4", 'shown in the review where it will go');
+  await execute(demo, plan);
+  const rows = (await loadAll(demo)).model.rows.cards;
+  assert.deepEqual(rows.map((r) => r.card), ['Open A', 'Open B', 'New E', 'Closed C', 'Closed D'], 'in the sheet, before the closed cards');
+  assert.equal((rows[2] as Record<string, Cell>).closed, '', 'not closed');
+  assert.deepEqual(rows.slice(3).map((r) => (r as Record<string, Cell>).closed), [46331, 46300], 'closed cards keep their dates');
+
+  // The next one goes after the newest open card, still ahead of the closed ones
+  const { model: m2, data: d2 } = await loadAll(demo);
+  const f2 = editorFor(m2, d2, { kind: 'add', id: 'cards' }).build({ card: 'X', type: 'Visa', limit: '1' }).plan;
+  assert.equal(f2.ops[0].type === 'insertRow' && f2.ops[0].afterKey, rows[2]._key);
+});
+
 withFixture('bank accounts can be closed and reopened, each table finding its own Closed column', async () => {
   const f = fixture();
   const m0 = buildModel(f.values, f.formulas);

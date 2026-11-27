@@ -69,6 +69,8 @@ export interface InsertOp {
   id: TableId;
   cells: Record<string, CellValue>;
   expectLastKey?: string;
+  /** insert just below this row instead of at the table's end (e.g. after the last open card, before closed ones) */
+  afterKey?: string;
 }
 
 /**
@@ -221,6 +223,9 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
       const last = rowsOf(model, insert.id).at(-1);
       if (last?._key !== insert.expectLastKey) problems.push(`${insertTable.spec.tab}: rows were added or removed since you loaded it`);
     }
+    if (insert.afterKey && !rowsOf(model, insert.id).some((r) => r._key === insert.afterKey)) {
+      problems.push(`${insertTable?.spec.tab ?? 'That table'}: the row it goes after is no longer there`);
+    }
   }
   const remove = plan.ops.find((o): o is RemoveOp => o.type === 'removeRow');
   if (remove && plan.ops.length > 1) throw new Error('A removal must be the only change in its plan');
@@ -276,7 +281,8 @@ export async function execute(backend: SheetsBackend, plan: Plan): Promise<{ req
     await backend.batchUpdate(requests);
     return { requests };
   }
-  const insertAt = insertTable ? insertTable.lastRow + 1 : null;
+  const after = insert?.afterKey ? rowsOf(model, insert.id).find((r) => r._key === insert.afterKey) : null;
+  const insertAt = !insertTable ? null : after ? after._row + 1 : insertTable.lastRow + 1;
   // Which cells move down when the row goes in: whole row, only this table's columns, or none
   let shifted: { from: number; to: number } | null = null;
 
@@ -432,11 +438,13 @@ export function planCellEdit(path: string[], ref: CellRefLike, value: CellValue,
 export function planInsert(
   model: Model, id: TableId, cells: Record<string, CellValue>, display: Record<string, string>, title: string,
   extra: { ops?: SetOp[]; changes?: Change[] } = {},
+  afterKey?: string,
 ): Plan {
   const tbl = tableOf(model, id)!;
   const headers = { ...tbl.spec.optionalHeaders, ...tbl.spec.headers } as Record<string, string>;
   const last = rowsOf(model, id).at(-1);
-  const newRow = tbl.lastRow + 1;
+  const after = afterKey ? rowsOf(model, id).find((r) => r._key === afterKey) : undefined;
+  const newRow = after ? after._row + 1 : tbl.lastRow + 1;
   return {
     title,
     changes: [
@@ -446,7 +454,7 @@ export function planInsert(
       { where: 'Formula columns', a1: `${tbl.spec.tab} row ${newRow + 1}`, before: '—', after: 'copied from the row above' },
       ...(extra.changes ?? []),
     ],
-    ops: [{ type: 'insertRow', id, cells, expectLastKey: last?._key }, ...(extra.ops ?? [])],
+    ops: [{ type: 'insertRow', id, cells, expectLastKey: last?._key, ...(after ? { afterKey: after._key } : {}) }, ...(extra.ops ?? [])],
   };
 }
 
